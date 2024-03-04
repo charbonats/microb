@@ -26,4 +26,13 @@ build_deps = ["build-essential", "libffi-dev"]
 system_deps = ["gettext"]
 env = { "FOO" = "bar" }
 labels = { "com.example.foo" = "${TEST:-World}" }
-indices = [{ "url" = "https://pypi.org/simple" }]
+indices = [
+    { "url" = "https://pypi.org/simple" }
+]
+copy_files = [
+    { "src" = "file.txt", "dst" = "/file.txt" },
+    { "from" = "docker.io/nats:2.10", "src" = "/nats-server", "dst" = "/nats-server" },
+]
+add_files = [
+    { "src" = "https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/reference.md", "dst" = "/reference.md" },
+]

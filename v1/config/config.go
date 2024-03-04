@@ -61,6 +61,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		Dependencies:  pyproject.Project.Dependencies,
 		Indices:       appConfig.Indices,
 		CopyFiles:     appConfig.CopyFiles,
+		AddFiles:      appConfig.AddFiles,
 	}
 	return &config, nil
 }
@@ -92,9 +93,17 @@ type Config struct {
 	Indices       []Index           // Extra index urls to use
 	Dependencies  []string          // Dependencies to install
 	CopyFiles     []FileToCopy      // Files to copy to the final image
+	AddFiles      []FileToAdd       // Files to add to the final image
 }
 
 type FileToCopy struct {
+	From        string `toml:"from"`
+	Source      string `toml:"src"`
+	Destination string `toml:"dst"`
+}
+
+type FileToAdd struct {
+	Checksum    string `toml:"checksum"`
 	Source      string `toml:"src"`
 	Destination string `toml:"dst"`
 }
@@ -142,6 +151,7 @@ type MicrobTarget struct {
 	BuildDeps     []string          `toml:"build_deps"`
 	SystemDeps    []string          `toml:"system_deps"`
 	CopyFiles     []FileToCopy      `toml:"copy_files"`
+	AddFiles      []FileToAdd       `toml:"add_files"`
 }
 
 func (c Config) Export() (string, error) {

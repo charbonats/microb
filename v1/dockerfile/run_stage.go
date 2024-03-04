@@ -16,6 +16,7 @@ func runStage(c *config.Config, placeholders map[string]string) string {
 	dockerfile += installSystemDeps(c)
 	dockerfile += nonRootUser(c)
 	dockerfile += copy(c)
+	dockerfile += add(c)
 	dockerfile += entrypoint(c)
 	dockerfile += env(c.Env, placeholders)
 	dockerfile += labels(utils.Union(defaulLabels, c.Labels), placeholders)
@@ -36,7 +37,7 @@ func installSystemDeps(c *config.Config) string {
 		for _, dep := range c.SystemDeps {
 			line += fmt.Sprintf(" %s ", dep)
 		}
-		line += " && rm -rf /var/lib/apt/lists/*"
+		line += " && rm -rf /var/lib/apt/lists/*\n"
 	}
 	return line
 }
@@ -104,7 +105,25 @@ func copy(c *config.Config) string {
 	if len(c.CopyFiles) > 0 {
 		line += "\n"
 		for _, f := range c.CopyFiles {
-			line += fmt.Sprintf("COPY %s %s\n", f.Source, f.Destination)
+			if f.From != "" {
+				line += fmt.Sprintf("COPY --from=%s %s %s\n", f.From, f.Source, f.Destination)
+			} else {
+				line += fmt.Sprintf("COPY %s %s\n", f.Source, f.Destination)
+			}
+		}
+	}
+	return line
+}
+
+func add(c *config.Config) string {
+	line := "\n"
+	if len(c.AddFiles) > 0 {
+		line += "\n"
+		for _, f := range c.AddFiles {
+			if f.Checksum != "" {
+				line += fmt.Sprintf("ADD --checksum=%s %s %s\n", f.Checksum, f.Source, f.Destination)
+			}
+			line += fmt.Sprintf("ADD %s %s\n", f.Source, f.Destination)
 		}
 	}
 	return line
