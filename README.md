@@ -64,7 +64,11 @@ in the `pyproject.toml`, as this is independent of the used builder cli.
 
 The `pyproject.toml` file is a standard file for python projects. It is used to configure the project and its dependencies.
 
-Several build configurations can be defined in a single `pyproject.toml`. Each build configuration is defined in a separate section under `[tool.microb.target]`. The default build configuration is defined under `[tool.microb.target.default]`.
+Several build configurations can be defined in a single `pyproject.toml`. Each build configuration is defined in a separate section under `[tool.microb.target]`. The default build configuration is defined under `[tool.microb.target.default]`. To build a specific target, use the `microb_target` build argument:
+
+```bash
+docker build -t example:latest --build-arg microb_target=default -f pyproject.toml .
+```
 
 The frontend is compatible with linux, windows and mac. It also supports various cpu architectures.
 Currently `i386`, `amd64`, `arm/v6`, `arm/v7`, `arm64/v8` are supported. Buildkit automatically picks the right version
