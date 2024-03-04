@@ -1,8 +1,6 @@
 package config
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +10,8 @@ import (
 	"github.com/hashicorp/go-version"
 )
 
+// NewConfigFromBytes creates a new Config from a byte array and a target.
+// Byte array is expected to be UTF-8 encoded TOML data from a pyproject.toml file.
 func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 	var pyproject PyProject
 	_, err := toml.Decode(string(data), &pyproject)
@@ -66,6 +66,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 	return &config, nil
 }
 
+// NewConfigFromFile creates a new Config from a file path and a target.
 func NewConfigFromFile(path string, target string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -79,7 +80,9 @@ func NewConfigFromFile(path string, target string) (*Config, error) {
 	return NewConfigFromBytes(content, target)
 }
 
-// Config is a struct that represents a build config
+// Config is a struct that represents a build config.
+// A config is obtained from merging information found
+// at the project level and the target level.
 type Config struct {
 	Name          string            // Name of the project
 	Authors       []Author          // Authors of the project
@@ -92,22 +95,30 @@ type Config struct {
 	SystemDeps    []string          // System dependencies (not installed during build, only installed in final image)
 	Indices       []Index           // Extra index urls to use
 	Dependencies  []string          // Dependencies to install
-	CopyFiles     []FileToCopy      // Files to copy to the final image
-	AddFiles      []FileToAdd       // Files to add to the final image
+	CopyFiles     []Copy            // Files to copy to the final image
+	AddFiles      []Add             // Files to add to the final image
 }
 
-type FileToCopy struct {
+// Copy is a struct that represents a file copy operation.
+// From is optional and can be used to specify a source outside of the build context.
+// When From is omitted, the source is assumed to be a file or directory in the build context.
+type Copy struct {
 	From        string `toml:"from"`
 	Source      string `toml:"src"`
 	Destination string `toml:"dst"`
 }
 
-type FileToAdd struct {
+// Add is a struct that represents a file add operation.
+// Checksum is optional and can be used to verify the integrity of the file.
+type Add struct {
 	Checksum    string `toml:"checksum"`
 	Source      string `toml:"src"`
 	Destination string `toml:"dst"`
 }
 
+// Index is a struct that represents a package index.
+// Trust is optional and can be used to skip certificate verification.
+// It is not recommended to use trust unless you are sure the index is owned by you or a trusted party.
 type Index struct {
 	Url      string `toml:"url"`
 	Username string `toml:"username"`
@@ -121,6 +132,7 @@ type PyProject struct {
 	Tool    Tool    `toml:"tool"`
 }
 
+// Project is a struct that represents a project section in a pyproject.toml file.
 type Project struct {
 	Name           string   `toml:"name"`
 	Authors        []Author `toml:"authors"`
@@ -128,19 +140,26 @@ type Project struct {
 	RequiresPython string   `toml:"requires-python"`
 }
 
+// Author is a struct that represents an author found in a pyproject.toml file.
 type Author struct {
 	Name  string `toml:"name"`
 	Email string `toml:"email"`
 }
 
+// Tool is a struct that represents a tool section in a pyproject.toml file.
+// It only contains the microb section and is not a complete representation of the file.
 type Tool struct {
 	Microb Microb `toml:"microb"`
 }
 
+// Microb is a struct that represents a microb section in a pyproject.toml file.
+// For now, it only contains a map of targets.
 type Microb struct {
 	Target map[string]MicrobTarget `toml:"target"`
 }
 
+// MicrobTarget is a struct that represents a build target.
+// All fields are optional and will be filled with default values if omitted.
 type MicrobTarget struct {
 	Entrypoint    []string          `toml:"entrypoint"`
 	Command       []string          `toml:"command"`
@@ -150,14 +169,8 @@ type MicrobTarget struct {
 	Labels        map[string]string `toml:"labels"`
 	BuildDeps     []string          `toml:"build_deps"`
 	SystemDeps    []string          `toml:"system_deps"`
-	CopyFiles     []FileToCopy      `toml:"copy_files"`
-	AddFiles      []FileToAdd       `toml:"add_files"`
-}
-
-func (c Config) Export() (string, error) {
-	var out bytes.Buffer
-	json.NewEncoder(&out).Encode(c)
-	return out.String(), nil
+	CopyFiles     []Copy            `toml:"copy_files"`
+	AddFiles      []Add             `toml:"add_files"`
 }
 
 func findVersion(requires string, target string) (string, error) {

@@ -26,6 +26,7 @@ var defaulLabels = map[string]string{
 	"microb.version":                       "v1",
 }
 
+// Microb2Dockerfile translates a microb config into a Dockerfile.
 func Microb2Dockerfile(c *config.Config, placeholders map[string]string) string {
 	dockerfile := buildStage(c, placeholders)
 	dockerfile += runStage(c, placeholders)

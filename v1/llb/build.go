@@ -39,8 +39,9 @@ const (
 	labelPrefix = "label:"
 )
 
-// Build builds an image from a context and a client.
-// Build request is defined by the client's BuildOpts.
+// Build builds an image by first reading the pyproject.toml file from the local
+// context and then translating it into a Dockerfile. The Dockerfile is then
+// compiled to an LLB state and solved to produce a build result.
 func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	buildOpts := c.BuildOpts()
 	opts := buildOpts.Opts
