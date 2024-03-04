@@ -10,6 +10,20 @@ import (
 	"github.com/hashicorp/go-version"
 )
 
+// NewConfigFromFile creates a new Config from a file path and a target.
+func NewConfigFromFile(path string, target string) (*Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	return NewConfigFromBytes(content, target)
+}
+
 // NewConfigFromBytes creates a new Config from a byte array and a target.
 // Byte array is expected to be UTF-8 encoded TOML data from a pyproject.toml file.
 func NewConfigFromBytes(data []byte, target string) (*Config, error) {
@@ -49,54 +63,44 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		return nil, err
 	}
 	config := Config{
-		Name:          pyproject.Project.Name,
-		Authors:       pyproject.Project.Authors,
-		PythonVersion: pythonVersion,
-		Entrypoint:    appConfig.Entrypoint,
-		Command:       appConfig.Command,
-		Env:           appConfig.Env,
-		Labels:        appConfig.Labels,
-		BuildDeps:     appConfig.BuildDeps,
-		SystemDeps:    appConfig.SystemDeps,
-		Dependencies:  pyproject.Project.Dependencies,
-		Indices:       appConfig.Indices,
-		CopyFiles:     appConfig.CopyFiles,
-		AddFiles:      appConfig.AddFiles,
+		Name:                 pyproject.Project.Name,
+		Authors:              pyproject.Project.Authors,
+		PythonVersion:        pythonVersion,
+		Entrypoint:           appConfig.Entrypoint,
+		Command:              appConfig.Command,
+		Env:                  appConfig.Env,
+		Labels:               appConfig.Labels,
+		BuildDeps:            appConfig.BuildDeps,
+		SystemDeps:           appConfig.SystemDeps,
+		Dependencies:         pyproject.Project.Dependencies,
+		Indices:              appConfig.Indices,
+		CopyFiles:            appConfig.CopyFiles,
+		CopyFilesBeforeBuild: appConfig.CopyFilesBeforeBuild,
+		AddFiles:             appConfig.AddFiles,
+		AddFilesBeforeBuild:  appConfig.AddFilesBeforeBuild,
 	}
 	return &config, nil
-}
-
-// NewConfigFromFile creates a new Config from a file path and a target.
-func NewConfigFromFile(path string, target string) (*Config, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	return NewConfigFromBytes(content, target)
 }
 
 // Config is a struct that represents a build config.
 // A config is obtained from merging information found
 // at the project level and the target level.
 type Config struct {
-	Name          string            // Name of the project
-	Authors       []Author          // Authors of the project
-	PythonVersion string            // Python version to use
-	Entrypoint    []string          // Default command to run. Arguments provided to the container will be appended to this command.
-	Command       []string          // Command to run when no arguments are provided. Command is concatenated with the entrypoint.
-	Env           map[string]string // Additional environment variables to add to the final image
-	Labels        map[string]string // Addiional labels to add to the final image
-	BuildDeps     []string          // Build dependencies (not installed in final image)
-	SystemDeps    []string          // System dependencies (not installed during build, only installed in final image)
-	Indices       []Index           // Extra index urls to use
-	Dependencies  []string          // Dependencies to install
-	CopyFiles     []Copy            // Files to copy to the final image
-	AddFiles      []Add             // Files to add to the final image
+	Name                 string            // Name of the project
+	Authors              []Author          // Authors of the project
+	PythonVersion        string            // Python version to use
+	Entrypoint           []string          // Default command to run. Arguments provided to the container will be appended to this command.
+	Command              []string          // Command to run when no arguments are provided. Command is concatenated with the entrypoint.
+	Env                  map[string]string // Additional environment variables to add to the final image
+	Labels               map[string]string // Addiional labels to add to the final image
+	BuildDeps            []string          // Build dependencies (not installed in final image)
+	SystemDeps           []string          // System dependencies (not installed during build, only installed in final image)
+	Indices              []Index           // Extra index urls to use
+	Dependencies         []string          // Dependencies to install
+	CopyFiles            []Copy            // Files to copy to the final image
+	CopyFilesBeforeBuild []Copy            // Files to copy to the build context before building
+	AddFiles             []Add             // Files to add to the final image
+	AddFilesBeforeBuild  []Add             // Files to add to the build context before building
 }
 
 // Copy is a struct that represents a file copy operation.
@@ -161,16 +165,18 @@ type Microb struct {
 // MicrobTarget is a struct that represents a build target.
 // All fields are optional and will be filled with default values if omitted.
 type MicrobTarget struct {
-	Entrypoint    []string          `toml:"entrypoint"`
-	Command       []string          `toml:"command"`
-	PythonVersion string            `toml:"python_version"`
-	Indices       []Index           `toml:"indices"`
-	Env           map[string]string `toml:"environment"`
-	Labels        map[string]string `toml:"labels"`
-	BuildDeps     []string          `toml:"build_deps"`
-	SystemDeps    []string          `toml:"system_deps"`
-	CopyFiles     []Copy            `toml:"copy_files"`
-	AddFiles      []Add             `toml:"add_files"`
+	Entrypoint           []string          `toml:"entrypoint"`
+	Command              []string          `toml:"command"`
+	PythonVersion        string            `toml:"python_version"`
+	Indices              []Index           `toml:"indices"`
+	Env                  map[string]string `toml:"environment"`
+	Labels               map[string]string `toml:"labels"`
+	BuildDeps            []string          `toml:"build_deps"`
+	SystemDeps           []string          `toml:"system_deps"`
+	CopyFiles            []Copy            `toml:"copy_files"`
+	CopyFilesBeforeBuild []Copy            `toml:"copy_files_before_build"`
+	AddFiles             []Add             `toml:"add_files"`
+	AddFilesBeforeBuild  []Add             `toml:"add_files_before_build"`
 }
 
 func findVersion(requires string, target string) (string, error) {

@@ -14,6 +14,8 @@ func buildStage(c *config.Config, placeholders map[string]string) string {
 	dockerfile := fromBuilder(c)
 	dockerfile += installBuildDeps(c)
 	dockerfile += env(utils.Union(defaultEnvs, c.Env), placeholders)
+	dockerfile += copyBeforeBuild(c)
+	dockerfile += addBeforeBuild(c)
 	dockerfile += installPythonDeps(c)
 	dockerfile += installPythonProject(c)
 	dockerfile += clearCachedDataFromInstall(c)
@@ -32,6 +34,35 @@ func installBuildDeps(c *config.Config) string {
 	line := fmt.Sprintf("RUN %s ", aptCacheMount)
 	line += "apt-get update && apt-get install -y --no-install-recommends "
 	line += strings.Join(c.BuildDeps, " ")
+	return line
+}
+
+func copyBeforeBuild(c *config.Config) string {
+	line := ""
+	if len(c.CopyFilesBeforeBuild) > 0 {
+		line += "\n"
+		for _, f := range c.CopyFiles {
+			if f.From != "" {
+				line += fmt.Sprintf("COPY --from=%s %s %s\n", f.From, f.Source, f.Destination)
+			} else {
+				line += fmt.Sprintf("COPY %s %s\n", f.Source, f.Destination)
+			}
+		}
+	}
+	return line
+}
+
+func addBeforeBuild(c *config.Config) string {
+	line := ""
+	if len(c.AddFilesBeforeBuild) > 0 {
+		line += "\n"
+		for _, f := range c.AddFilesBeforeBuild {
+			if f.Checksum != "" {
+				line += fmt.Sprintf("ADD --checksum=%s %s %s\n", f.Checksum, f.Source, f.Destination)
+			}
+			line += fmt.Sprintf("ADD %s %s\n", f.Source, f.Destination)
+		}
+	}
 	return line
 }
 

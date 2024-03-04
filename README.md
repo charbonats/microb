@@ -93,7 +93,8 @@ Available configuration options are listed in the table below.
 | 10  | `command`        | no       | the command to use in the final image. This is the command that is run when the container starts if no arguments are given                                                        | -       | `string[]`              |
 | -   | `copy_files`     | no       | additional files to copy into the final image. Files are not copied to the build stage.                                                                                           | -       | `Copy[]`                |
 | -   | `add_files`      | no       | additional files to add into the final image. Files are not added to the build stage.                                                                                             | -       | `Add[]`                 |
-
+| -   | `copy_files_before_build`     | no       | additional files to copy into the build stage. Files are not copied to the final image.                                                                                           | -       | `Copy[]`                |
+| -   | `add_files_before_build`      | no       | additional files to add into the build stage. Files are not added to the final image.                                                                                             | -       | `Add[]`                 |
 #### Copy
 
 > Refer to https://docs.docker.com/reference/dockerfile/#copy for more information. Note that only `--from` option is supported. The other options (such as `--chmod` or `--chown`) are not currently supported.
