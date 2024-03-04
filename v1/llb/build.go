@@ -35,12 +35,17 @@ const (
 	// e.g. `buildctl ... --opt build-arg:http_proxy=http://foo`
 	// See https://github.com/moby/buildkit/blob/81b6ff2c55565bdcb9f0dbcff52515f7c7bb429c/frontend/dockerfile/docs/reference.md#predefined-args
 	buildArgPrefix = "build-arg:"
+	// Support the dockerfile frontend's label: options
+	labelPrefix = "label:"
 )
 
+// Build builds an image from a context and a client.
+// Build request is defined by the client's BuildOpts.
 func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	buildOpts := c.BuildOpts()
 	opts := buildOpts.Opts
 	buildargs := utils.Filter(opts, buildArgPrefix)
+	labels := utils.Filter(opts, labelPrefix)
 	target := ""
 	for k, v := range buildargs {
 		if strings.ToLower(k) == "microb_target" {
@@ -52,7 +57,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get pyproject.toml")
 	}
-	dockerfile := dockerfile.Microb2Dockerfile(microbConfig)
+	dockerfile := dockerfile.Microb2Dockerfile(microbConfig, buildargs)
 
 	excludes, err := readDockerIgnoreFile(ctx, c)
 
@@ -103,7 +108,8 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 				result, err := buildImage(ctx, c, dockerfile, dockerfile2llb.ConvertOpt{
 					MetaResolver:   c,
 					SessionID:      buildOpts.SessionID,
-					BuildArgs:      utils.Filter(opts, buildArgPrefix),
+					BuildArgs:      buildargs,
+					Labels:         labels,
 					Excludes:       excludes,
 					BuildPlatforms: buildPlatforms,
 					TargetPlatform: platform,
@@ -137,54 +143,6 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	return finalResult, nil
 }
 
-func parseCacheOptions(opts map[string]string) ([]client.CacheOptionsEntry, error) {
-	var cacheImports []client.CacheOptionsEntry
-	// new API
-	if cacheImportsStr := opts[keyCacheImports]; cacheImportsStr != "" {
-		var cacheImportsUM []client.CacheOptionsEntry
-		if err := json.Unmarshal([]byte(cacheImportsStr), &cacheImportsUM); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal %s (%q)", keyCacheImports, cacheImportsStr)
-		}
-		for _, um := range cacheImportsUM {
-			cacheImports = append(cacheImports, client.CacheOptionsEntry{Type: um.Type, Attrs: um.Attrs})
-		}
-	}
-	// old API
-	if cacheFromStr := opts[keyCacheFrom]; cacheFromStr != "" {
-		cacheFrom := strings.Split(cacheFromStr, ",")
-		for _, s := range cacheFrom {
-			im := client.CacheOptionsEntry{
-				Type: "registry",
-				Attrs: map[string]string{
-					"ref": s,
-				},
-			}
-			// FIXME(AkihiroSuda): skip append if already exists
-			cacheImports = append(cacheImports, im)
-		}
-	}
-
-	return cacheImports, nil
-}
-
-func (br *buildResult) AddToClientResult(cr *client.Result) {
-	if br.MultiPlatform {
-		cr.AddMeta(
-			fmt.Sprintf("%s/%s", exptypes.ExporterImageConfigKey, br.ExportPlatform.ID),
-			br.ImageConfig,
-		)
-		cr.AddMeta(
-			fmt.Sprintf("%s/%s", exptypes.ExporterBuildInfo, br.ExportPlatform.ID),
-			br.BuildInfo,
-		)
-		cr.AddRef(br.ExportPlatform.ID, br.Reference)
-	} else {
-		cr.AddMeta(exptypes.ExporterImageConfigKey, br.ImageConfig)
-		cr.AddMeta(exptypes.ExporterBuildInfo, br.BuildInfo)
-		cr.SetRef(br.Reference)
-	}
-}
-
 // Represents the result of a single image build
 type buildResult struct {
 	// Reference to built image
@@ -204,6 +162,25 @@ type buildResult struct {
 
 	// Exportable platform information (platform and platform ID)
 	ExportPlatform exptypes.Platform
+}
+
+// AddToClientResult adds the result of a single image build to a client.Result
+func (br *buildResult) AddToClientResult(cr *client.Result) {
+	if br.MultiPlatform {
+		cr.AddMeta(
+			fmt.Sprintf("%s/%s", exptypes.ExporterImageConfigKey, br.ExportPlatform.ID),
+			br.ImageConfig,
+		)
+		cr.AddMeta(
+			fmt.Sprintf("%s/%s", exptypes.ExporterBuildInfo, br.ExportPlatform.ID),
+			br.BuildInfo,
+		)
+		cr.AddRef(br.ExportPlatform.ID, br.Reference)
+	} else {
+		cr.AddMeta(exptypes.ExporterImageConfigKey, br.ImageConfig)
+		cr.AddMeta(exptypes.ExporterBuildInfo, br.BuildInfo)
+		cr.SetRef(br.Reference)
+	}
 }
 
 // buildImage compiles a Dockerfile to an LLB state and solves it to produce a build result
@@ -403,4 +380,35 @@ func readDockerIgnoreFile(ctx context.Context, c client.Client) ([]string, error
 	}
 
 	return excludes, nil
+}
+
+// parseCacheOptions parses cache options from the build options
+func parseCacheOptions(opts map[string]string) ([]client.CacheOptionsEntry, error) {
+	var cacheImports []client.CacheOptionsEntry
+	// new API
+	if cacheImportsStr := opts[keyCacheImports]; cacheImportsStr != "" {
+		var cacheImportsUM []client.CacheOptionsEntry
+		if err := json.Unmarshal([]byte(cacheImportsStr), &cacheImportsUM); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal %s (%q)", keyCacheImports, cacheImportsStr)
+		}
+		for _, um := range cacheImportsUM {
+			cacheImports = append(cacheImports, client.CacheOptionsEntry{Type: um.Type, Attrs: um.Attrs})
+		}
+	}
+	// old API
+	if cacheFromStr := opts[keyCacheFrom]; cacheFromStr != "" {
+		cacheFrom := strings.Split(cacheFromStr, ",")
+		for _, s := range cacheFrom {
+			im := client.CacheOptionsEntry{
+				Type: "registry",
+				Attrs: map[string]string{
+					"ref": s,
+				},
+			}
+			// FIXME(AkihiroSuda): skip append if already exists
+			cacheImports = append(cacheImports, im)
+		}
+	}
+
+	return cacheImports, nil
 }

@@ -21,9 +21,8 @@ var defaulLabels = map[string]string{
 	"microb.version":                       "v1",
 }
 
-func Microb2Dockerfile(c *config.Config) string {
-	dockerfile := buildStage(c)
-	dockerfile += runStage(c)
-
+func Microb2Dockerfile(c *config.Config, placeholders map[string]string) string {
+	dockerfile := buildStage(c, placeholders)
+	dockerfile += runStage(c, placeholders)
 	return dockerfile
 }

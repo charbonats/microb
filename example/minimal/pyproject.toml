@@ -3,6 +3,7 @@
 name = "my_example"
 authors = [
     {name = "Guillaume Charbonnier", email = "gu.charbon@gmail.com"},
+    {name = "Someone else", email = "someone.else@gmail.com"},
 ]
 requires-python = ">=3.8,<3.12"
 dependencies = [
@@ -24,5 +25,5 @@ command = ["example:setup"]
 build_deps = ["build-essential", "libffi-dev"]
 system_deps = ["gettext"]
 env = { "FOO" = "bar" }
-labels = { "com.example.foo" = "bar" }
+labels = { "com.example.foo" = "${TEST:-World}" }
 indices = [{ "url" = "https://pypi.org/simple" }]

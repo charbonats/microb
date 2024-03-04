@@ -66,7 +66,7 @@ func printDockerfile(filename string, app string, out io.Writer) error {
 	if err != nil {
 		return errors.Wrap(err, "opening pyproject.toml")
 	}
-	dockerfile := dockerfile.Microb2Dockerfile(c)
+	dockerfile := dockerfile.Microb2Dockerfile(c, nil)
 	out.Write([]byte(dockerfile))
 	return nil
 }
@@ -77,7 +77,7 @@ func printLlb(filename string, app string, out io.Writer) error {
 	if err != nil {
 		return errors.Wrap(err, "opening pyproject.toml")
 	}
-	dockerfile := dockerfile.Microb2Dockerfile(c)
+	dockerfile := dockerfile.Microb2Dockerfile(c, nil)
 	st, _, _, _ := dockerfile2llb.Dockerfile2LLB(context.TODO(), []byte(dockerfile), dockerfile2llb.ConvertOpt{})
 	dt, err := st.Marshal(context.Background())
 	if err != nil {

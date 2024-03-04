@@ -10,10 +10,10 @@ import (
 	"github.com/charbonats/microbuild/v1/utils"
 )
 
-func buildStage(c *config.Config) string {
+func buildStage(c *config.Config, placeholders map[string]string) string {
 	dockerfile := fromBuilder(c)
 	dockerfile += installBuildDeps(c)
-	dockerfile += env(utils.Union(defaultEnvs, c.Env))
+	dockerfile += env(utils.Union(defaultEnvs, c.Env), placeholders)
 	dockerfile += installPythonDeps(c)
 	dockerfile += installPythonProject(c)
 	dockerfile += clearCachedDataFromInstall(c)
@@ -33,17 +33,6 @@ func installBuildDeps(c *config.Config) string {
 	line += "apt-get update && apt-get install -y --no-install-recommends "
 	line += strings.Join(c.BuildDeps, " ")
 	return line
-}
-
-func env(envs map[string]string) string {
-	if len(envs) == 0 {
-		return ""
-	}
-	lines := []string{"\n"}
-	for k, v := range envs {
-		lines = append(lines, fmt.Sprintf("ENV %s=%s", k, v))
-	}
-	return strings.Join(lines, "\n")
 }
 
 func indices(c *config.Config) string {

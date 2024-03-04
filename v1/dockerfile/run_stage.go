@@ -4,19 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/charbonats/microbuild/v1/config"
 	"github.com/charbonats/microbuild/v1/utils"
+	"mvdan.cc/sh/v3/shell"
 )
 
-func runStage(c *config.Config) string {
+func runStage(c *config.Config, placeholders map[string]string) string {
 	dockerfile := fromFinal(c)
 	dockerfile += installSystemDeps(c)
 	dockerfile += nonRootUser(c)
 	dockerfile += copy(c)
 	dockerfile += entrypoint(c)
-	dockerfile += labels(utils.Union(defaulLabels, c.Labels))
-
+	dockerfile += env(c.Env, placeholders)
+	dockerfile += labels(utils.Union(defaulLabels, c.Labels), placeholders)
+	dockerfile += authors(c)
 	return dockerfile
 }
 
@@ -45,10 +48,49 @@ func nonRootUser(c *config.Config) string {
 	return line
 }
 
-func labels(labels map[string]string) string {
+func env(envs map[string]string, placeholders map[string]string) string {
+	if len(envs) == 0 {
+		return ""
+	}
+	lines := []string{"\n"}
+	for k, v := range envs {
+		v, err := shell.Expand(v, func(key string) string {
+			return placeholders[key]
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		lines = append(lines, fmt.Sprintf("ENV %s=%s", k, v))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func labels(labels map[string]string, placeholders map[string]string) string {
 	line := "\n"
 	for k, v := range labels {
+		v, err := shell.Expand(v, func(key string) string {
+			return placeholders[key]
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
 		line += fmt.Sprintf("LABEL %s=\"%s\"\n", k, v)
+	}
+	return line
+}
+
+func authors(c *config.Config) string {
+	line := "\n"
+	if len(c.Authors) > 0 {
+		authors := make([]string, len(c.Authors))
+		for idx, author := range c.Authors {
+			if author.Email != "" {
+				authors[idx] = fmt.Sprintf("%s <%s>", author.Name, author.Email)
+			} else {
+				authors[idx] = author.Name
+			}
+		}
+		line += fmt.Sprintf("LABEL org.opencontainers.image.authors=\"%s\"", strings.Join(authors, ", "))
 	}
 	return line
 }
