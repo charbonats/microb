@@ -3,3 +3,5 @@
 vendor
 .venv
 /microb
+*.egg-info
+build
