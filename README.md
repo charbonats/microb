@@ -18,7 +18,6 @@ Modern Python packages can contain a `pyproject.toml` file, first introduced in 
 
 ```toml
 #syntax=gucharbon/microb                           # [1]  Enable automatic microb syntax support
-
 [project]
 name = "my_example"
 authors = [
