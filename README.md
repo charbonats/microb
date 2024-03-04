@@ -1,3 +1,6 @@
+[![Docker Pulls](https://badgen.net/docker/pulls/gucharbon/microb?icon=docker&label=pulls)](https://hub.docker.com/r/gucharbon/microb/)
+[![Docker Image Size](https://badgen.net/docker/size/gucharbon/microb?icon=docker&label=image%20size)](https://hub.docker.com/r/gucharbon/microb/)
+
 # `microb` - build python based container images the easy way
 
 > Microb stands for Micro Build. The name originates from the fact that I wanted a simple and easy way to build Docker images for [NATS Micro services](https://charbonats.github.io/nats-micro)
