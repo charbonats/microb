@@ -1,0 +1,27 @@
+#syntax=docker.io/gucharbon/microb
+[project]
+name = "my_example"
+authors = [
+    {name = "Guillaume Charbonnier", email = "gu.charbon@gmail.com"},
+]
+requires-python = ">=3.8,<3.12"
+dependencies = [
+    "nats-py",
+    "nats-micro@git+ssh://git@github.com/charbonats/nats-micro.git",
+    "nkeys"
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+py-modules = ["example"]
+
+[tool.setuptools.dynamic]
+version = {attr = "example.__version__"}
+
+[tool.microb.target.default]
+entrypoint = ["micro", "run"]
+command = ["example:setup"]
+build_deps = ["build-essential", "libffi-dev"]
+env = { "FOO" = "bar" }
+labels = { "com.example.foo" = "bar" }
+indices = [{ "url" = "https://pypi.org/simple" }]
