@@ -17,7 +17,7 @@ Modern Python packages can contain a `pyproject.toml` file, first introduced in 
 [//]: # (@formatter:off)
 
 ```toml
-#syntax=gucharbon/microb                         # [1]  Enable automatic microb syntax support
+#syntax=gucharbon/microb                           # [1]  Enable automatic microb syntax support
 
 [project]
 name = "my_example"
@@ -38,15 +38,15 @@ py-modules = ["example"]
 version = {attr = "example.__version__"}
 
 [tool.microb.target.default]
-api_version = "v1"                               # [2] Configure the microb API version used
-python_version = "3.11"                          # [3] Configure the python interpreter version to use
-build_deps = ["build-essential", "libffi-dev"]   # [4] Additional apt packages to install during build (not installed in final image)
-system_deps = ["gettext"]                        # [5] Additional apt packages to install in final image (not installed in build image)
-env = { "FOO": "bar" }                           # [6] Additional environment variables to set in final image
-indices = [{ "url": "https://pypi.org/simple" }] # [7] Configure pip index to use
-labels = { "com.example.foo": "bar" }            # [8] Additional labels to add to the final image
-entrypoint = ["micro", "run"]                    # [9] Configure the entrypoint used in the final image
-command = ["example:setup"]                      # [10] Configure the command used in the final image
+api_version = "v1"                                 # [2] Configure the microb API version used
+python_version = "3.11"                            # [3] Configure the python interpreter version to use
+build_deps = ["build-essential", "libffi-dev"]     # [4] Additional apt packages to install during build (not installed in final image)
+system_deps = ["gettext"]                          # [5] Additional apt packages to install in final image (not installed in build image)
+env = { "FOO" = "bar" }                            # [6] Additional environment variables to set in final image
+indices = [{ "url" = "https://pypi.org/simple" }]  # [7] Configure pip index to use
+labels = {com.example.foo" = "bar"}                # [8] Additional labels to add to the final image
+entrypoint = ["micro", "run"]                      # [9] Configure the entrypoint used in the final image
+command = ["example:setup"]                        # [10] Configure the command used in the final image
 ```
 
 [//]: # (@formatter:on)
