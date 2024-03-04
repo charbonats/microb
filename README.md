@@ -77,7 +77,7 @@ for you from docker hub.
 Available configuration options are listed in the table below.
 
 |     | name             | required | description                                                                                                                                                                       | default | type                    |
-| --- |--- |---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| --- | ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------- |
 | 1   | -                | no       | instruct Docker to use `pyproject.toml` syntax for parsing this file                                                                                                              | -       | docker syntax directive |
 | 2   | `api_version`    | no       | api version of `microb` frontend. This is mainly due to future development to prevent incompatibilities                                                                           | `"v1"`  | enum: `["v1"]`          |
 | 3   | `python_version` | no       | the python interpreter version to use. Versions format is: `3`, `3.9` or `3.9.1`                                                                                                  | -       | `string`                |
@@ -88,15 +88,38 @@ Available configuration options are listed in the table below.
 | 8   | `labels`         | no       | additional labels to add to the final image. These have precedence over automatically added. It's possible to use shell substitution to use a value provided as a build argument. | -       | `map[string][string]`   |
 | 9   | `entrypoint`     | no       | the entrypoint to use in the final image. This is the command that is run when the container starts                                                                               | -       | `string[]`              |
 | 10  | `command`        | no       | the command to use in the final image. This is the command that is run when the container starts if no arguments are given                                                        | -       | `string[]`              |
+| -   | `copy_files`     | no       | additional files to copy into the final image. Files are not copied to the build stage.                                                                                           | -       | `Copy[]`                |
+| -   | `add_files`      | no       | additional files to add into the final image. Files are not added to the build stage.                                                                                             | -       | `Add[]`                 |
+
+#### Copy
+
+> Refer to https://docs.docker.com/reference/dockerfile/#copy for more information. Note that only `--from` option is supported. The other options (such as `--chmod` or `--chown`) are not currently supported.
+
+| name | required | description                          | default | type     |
+| ---- | -------- | ------------------------------------ | ------- | -------- |
+| `src`  | yes      | source path                          | -       | `string` |
+| `dst`  | yes      | destination path                     | -       | `string` |
+| `from` | no       | stage, context or image to copy from | -       | `string` |
+
+
+#### Add
+
+> Refer to https://docs.docker.com/reference/dockerfile/#add for more information. Note that only `--checksum` option is supported. The other options (such as `--chown`) are not currently supported.
+
+| name | required | description                          | default | type     |
+| ---- | -------- | ------------------------------------ | ------- | -------- |
+| `src`  | yes      | source path                          | -       | `string` |
+| `dst`  | yes      | destination path                     | -       | `string` |
+| `checksum` | no       | checksum used to verify file integrity  | -       | `string` |
 
 #### Index
 
 | name     | required | description                                                                                                 | default | type      |
 | -------- | -------- | ----------------------------------------------------------------------------------------------------------- | ------- | --------- |
-| url      | yes      | url of the additional index                                                                                 | -       | `string`  |
-| username | no       | optional username to authenticate. If you got a token for instance, as single factor, just set the username | -       | `string`  |
-| password | no       | optional password to use. If username is not set, this is ignored                                           | -       | `string`  |
-| trust    | no       | used to add the indices domain as trusted. Useful if the index uses a self-signed certificate or uses http  | `false` | `boolean` |
+| `url`      | yes      | url of the additional index                                                                                 | -       | `string`  |
+| `username` | no       | optional username to authenticate. If you got a token for instance, as single factor, just set the username | -       | `string`  |
+| `password` | no       | optional password to use. If username is not set, this is ignored                                           | -       | `string`  |
+| `trust`    | no       | used to add the indices domain as trusted. Useful if the index uses a self-signed certificate or uses http  | `false` | `boolean` |
 
 The [example folder](example) contains a few examples how you can use `microb`.
 
