@@ -76,27 +76,27 @@ for you from docker hub.
 
 Available configuration options are listed in the table below.
 
-|     | required | description                                                                                                                                                                                                                                                                              | default | type                    |
-|-----|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|-------------------------|
-| 1   | no      | instruct Docker to use `pyproject.toml` syntax for parsing this file                                                                                                                                                                                                                           | -       | docker syntax directive |
-| 2   | no       | api version of `microb` frontend. This is mainly due to future development to prevent incompatibilities                                                                                                                                                                                 | `"v1"`      | enum: `["v1"]`            |
-| 3   | no      | the python interpreter version to use. Versions format is: `3`, `3.9` or `3.9.1`                                                                                                                                                                                                         | -       | `string`                  |
-| 4   | no       | additional `apt` packages to install before staring the build. These are not part of the final image                                                                                                                                                                                     | -       | `string[]`                |
-| 5   | no       | additional `apt` packages to install in the final image. These are not part of the build image                                                                                                                                                                                           | -       | `string[]`                |
-| 6   | no       | additional environment variables. These are present in the build and in the run stage. It's possible to use shell substitution to use a value provided as a build argument.                                                                                                                                                                                                    | -       | `map[string][string]`   |
-| 7   | no       | additional list of index to consider for installing dependencies. The only required filed is `url`.        | -       | `Index[]`            |                                                                                                                                                                      
-| 8   | no       | additional labels to add to the final image. These have precedence over automatically added. It's possible to use shell substitution to use a value provided as a build argument.                                                                                                                                                                                              | -       | `map[string][string]`   |
-| 9   | no       | the entrypoint to use in the final image. This is the command that is run when the container starts                                                                                                                                                                                      | -       | `string[]`                |
-| 10   | no       | the command to use in the final image. This is the command that is run when the container starts if no arguments are given                                                                                                                                                               | -       | `string[]`                |
+|     | name             | required | description                                                                                                                                                                       | default | type                    |
+| --- |--- |---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | -                | no       | instruct Docker to use `pyproject.toml` syntax for parsing this file                                                                                                              | -       | docker syntax directive |
+| 2   | `api_version`    | no       | api version of `microb` frontend. This is mainly due to future development to prevent incompatibilities                                                                           | `"v1"`  | enum: `["v1"]`          |
+| 3   | `python_version` | no       | the python interpreter version to use. Versions format is: `3`, `3.9` or `3.9.1`                                                                                                  | -       | `string`                |
+| 4   | `build_deps`     | no       | additional `apt` packages to install before staring the build. These are not part of the final image                                                                              | -       | `string[]`              |
+| 5   | `system_deps`    | no       | additional `apt` packages to install in the final image. These are not part of the build image                                                                                    | -       | `string[]`              |
+| 6   | `env`            | no       | additional environment variables. These are present in the build and in the run stage. It's possible to use shell substitution to use a value provided as a build argument.       | -       | `map[string][string]`   |
+| 7   | `indices`        | no       | additional list of index to consider for installing dependencies. The only required filed is `url`.                                                                               | -       | `Index[]`               |
+| 8   | `labels`         | no       | additional labels to add to the final image. These have precedence over automatically added. It's possible to use shell substitution to use a value provided as a build argument. | -       | `map[string][string]`   |
+| 9   | `entrypoint`     | no       | the entrypoint to use in the final image. This is the command that is run when the container starts                                                                               | -       | `string[]`              |
+| 10  | `command`        | no       | the command to use in the final image. This is the command that is run when the container starts if no arguments are given                                                        | -       | `string[]`              |
 
 #### Index
 
-| name     | required | description                                                                                                 | default | type    |
-|----------|----------|-------------------------------------------------------------------------------------------------------------|---------|---------|
+| name     | required | description                                                                                                 | default | type      |
+| -------- | -------- | ----------------------------------------------------------------------------------------------------------- | ------- | --------- |
 | url      | yes      | url of the additional index                                                                                 | -       | `string`  |
 | username | no       | optional username to authenticate. If you got a token for instance, as single factor, just set the username | -       | `string`  |
 | password | no       | optional password to use. If username is not set, this is ignored                                           | -       | `string`  |
-| trust    | no       | used to add the indices domain as trusted. Useful if the index uses a self-signed certificate or uses http  | `false`   | `boolean` |
+| trust    | no       | used to add the indices domain as trusted. Useful if the index uses a self-signed certificate or uses http  | `false` | `boolean` |
 
 The [example folder](example) contains a few examples how you can use `microb`.
 
@@ -186,12 +186,12 @@ $ go install github.com/charbonats/microb
 
 The following arguments are supported running the frontend:
 
-| name       |              description              |    type |       default |
-|------------|:-------------------------------------:|--------:|--------------:|
-| llb        |     output created llb to stdout      | `boolean` |         `false` |
-| dockerfile | print equivalent Dockerfile to stdout | `boolean` |         `false` |
-| buildkit   |  connect to buildkit and build image  | `boolean` |          `true` |
-| filename   |           path to pyproject.toml            |  `string` | `"pyproject.toml"` |
+| name       |              description              |      type |            default |
+| ---------- | :-----------------------------------: | --------: | -----------------: |
+| llb        |     output created llb to stdout      | `boolean` |            `false` |
+| dockerfile | print equivalent Dockerfile to stdout | `boolean` |            `false` |
+| buildkit   |  connect to buildkit and build image  | `boolean` |             `true` |
+| filename   |        path to pyproject.toml         |  `string` | `"pyproject.toml"` |
 
 For instance to show the created equivalent Dockerfile, use the
 command `go run ./cmd/microb/main.go -dockerfile -filename example/minimal/pyproject.toml`.
