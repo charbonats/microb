@@ -11,6 +11,8 @@ import (
 
 func runStage(c *config.Config) string {
 	dockerfile := fromFinal(c)
+	dockerfile += installSystemDeps(c)
+	dockerfile += nonRootUser(c)
 	dockerfile += copy(c)
 	dockerfile += entrypoint(c)
 	dockerfile += labels(utils.Union(defaulLabels, c.Labels))
@@ -21,6 +23,23 @@ func runStage(c *config.Config) string {
 func fromFinal(c *config.Config) string {
 	line := "\n"
 	line += fmt.Sprintf("FROM python:%s-slim\n", c.PythonVersion)
+	return line
+}
+
+func installSystemDeps(c *config.Config) string {
+	line := "\n"
+	if len(c.SystemDeps) > 0 {
+		line += "RUN apt-get update && apt-get install -y --no-install-recommends "
+		for _, dep := range c.SystemDeps {
+			line += fmt.Sprintf(" %s ", dep)
+		}
+		line += " && rm -rf /var/lib/apt/lists/*"
+	}
+	return line
+}
+
+func nonRootUser(c *config.Config) string {
+	line := "\n"
 	line += "RUN useradd --uid=65532 --user-group --home-dir=/home/nonroot --create-home nonroot\n"
 	line += "USER 65532:65532\n"
 	return line

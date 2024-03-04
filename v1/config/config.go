@@ -12,23 +12,38 @@ import (
 	"github.com/hashicorp/go-version"
 )
 
-func NewConfigFromBytes(data []byte, app string) (*Config, error) {
+func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 	var pyproject PyProject
 	_, err := toml.Decode(string(data), &pyproject)
 	if err != nil {
 		return nil, err
 	}
 	requiresPython := pyproject.Project.RequiresPython
-	if app == "" {
+	// If no target is specified
+	if target == "" {
+		// Look for the first target in the microb config
 		for name := range pyproject.Tool.Microb.Target {
-			app = name
+			target = name
 			break
 		}
+		// If there is still no target found, use default values
+		if target == "" {
+			pythonVersion, err := findVersion(requiresPython, "")
+			if err != nil {
+				return nil, err
+			}
+			return &Config{
+				Name:          pyproject.Project.Name,
+				Authors:       pyproject.Project.Authors,
+				PythonVersion: pythonVersion,
+				Dependencies:  pyproject.Project.Dependencies,
+			}, nil
+		}
 	}
-	if app == "" {
-		return nil, fmt.Errorf("no microb config found in pyproject.toml: %s", data)
+	appConfig, ok := pyproject.Tool.Microb.Target[target]
+	if !ok {
+		return nil, fmt.Errorf("target %s not found in pyproject.toml", target)
 	}
-	appConfig := pyproject.Tool.Microb.Target[app]
 	pythonVersion, err := findVersion(requiresPython, appConfig.PythonVersion)
 	if err != nil {
 		return nil, err
@@ -42,6 +57,7 @@ func NewConfigFromBytes(data []byte, app string) (*Config, error) {
 		Env:           appConfig.Env,
 		Labels:        appConfig.Labels,
 		BuildDeps:     appConfig.BuildDeps,
+		SystemDeps:    appConfig.SystemDeps,
 		Dependencies:  pyproject.Project.Dependencies,
 		Indices:       appConfig.Indices,
 		CopyFiles:     appConfig.CopyFiles,
@@ -49,7 +65,7 @@ func NewConfigFromBytes(data []byte, app string) (*Config, error) {
 	return &config, nil
 }
 
-func NewConfigFromFile(path string, app string) (*Config, error) {
+func NewConfigFromFile(path string, target string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -59,7 +75,7 @@ func NewConfigFromFile(path string, app string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewConfigFromBytes(content, app)
+	return NewConfigFromBytes(content, target)
 }
 
 // Config is a struct that represents a build config
@@ -72,6 +88,7 @@ type Config struct {
 	Env           map[string]string // Additional environment variables to add to the final image
 	Labels        map[string]string // Addiional labels to add to the final image
 	BuildDeps     []string          // Build dependencies (not installed in final image)
+	SystemDeps    []string          // System dependencies (not installed during build, only installed in final image)
 	Indices       []Index           // Extra index urls to use
 	Dependencies  []string          // Dependencies to install
 	CopyFiles     []FileToCopy      // Files to copy to the final image
@@ -123,6 +140,7 @@ type MicrobTarget struct {
 	Env           map[string]string `toml:"environment"`
 	Labels        map[string]string `toml:"labels"`
 	BuildDeps     []string          `toml:"build_deps"`
+	SystemDeps    []string          `toml:"system_deps"`
 	CopyFiles     []FileToCopy      `toml:"copy_files"`
 }
 

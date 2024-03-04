@@ -12,12 +12,11 @@ import (
 
 func buildStage(c *config.Config) string {
 	dockerfile := fromBuilder(c)
-	dockerfile += apt(c)
+	dockerfile += installBuildDeps(c)
 	dockerfile += env(utils.Union(defaultEnvs, c.Env))
-	dockerfile += installDeps(c)
-	dockerfile += installProject(c)
+	dockerfile += installPythonDeps(c)
+	dockerfile += installPythonProject(c)
 	dockerfile += clearCachedDataFromInstall(c)
-
 	return dockerfile
 }
 
@@ -26,7 +25,7 @@ func fromBuilder(c *config.Config) string {
 	return line
 }
 
-func apt(c *config.Config) string {
+func installBuildDeps(c *config.Config) string {
 	if len(c.BuildDeps) == 0 {
 		return ""
 	}
@@ -74,7 +73,7 @@ func indices(c *config.Config) string {
 	return indices
 }
 
-func installDeps(c *config.Config) string {
+func installPythonDeps(c *config.Config) string {
 	line := "\n"
 	line += fmt.Sprintf("RUN %s", pipCacheMount)
 	useSsh := false
@@ -93,7 +92,7 @@ func installDeps(c *config.Config) string {
 	return line
 }
 
-func installProject(c *config.Config) string {
+func installPythonProject(c *config.Config) string {
 	line := "\n"
 	line += "COPY . /projectdir\n"
 	line += fmt.Sprintf("RUN %s python -m pip install --no-deps /projectdir", pipCacheMount)

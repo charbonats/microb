@@ -22,6 +22,7 @@ version = {attr = "example.__version__"}
 entrypoint = ["micro", "run"]
 command = ["example:setup"]
 build_deps = ["build-essential", "libffi-dev"]
+system_deps = ["gettext"]
 env = { "FOO" = "bar" }
 labels = { "com.example.foo" = "bar" }
 indices = [{ "url" = "https://pypi.org/simple" }]

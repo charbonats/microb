@@ -41,14 +41,14 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	buildOpts := c.BuildOpts()
 	opts := buildOpts.Opts
 	buildargs := utils.Filter(opts, buildArgPrefix)
-	app := ""
+	target := ""
 	for k, v := range buildargs {
-		if strings.ToLower(k) == "micro_app" {
-			app = v
+		if strings.ToLower(k) == "microb_target" {
+			target = v
 			break
 		}
 	}
-	microbConfig, err := readMicrobConfig(ctx, c, app)
+	microbConfig, err := readMicrobConfig(ctx, c, target)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get pyproject.toml")
 	}
@@ -269,7 +269,7 @@ func buildImage(ctx context.Context, c client.Client, dockerfile string, convert
 
 // readMicrobConfig reads the pyproject.toml file from the local context and
 // returns a config.Config
-func readMicrobConfig(ctx context.Context, c client.Client, app string) (*config.Config, error) {
+func readMicrobConfig(ctx context.Context, c client.Client, target string) (*config.Config, error) {
 	opts := c.BuildOpts().Opts
 	filename := opts[keyConfigPath]
 	if filename == "" {
@@ -314,7 +314,7 @@ func readMicrobConfig(ctx context.Context, c client.Client, app string) (*config
 		return nil, errors.Wrapf(err, "failed to read pyproject.toml")
 	}
 
-	cfg, err := config.NewConfigFromBytes(pyprojectContent, app)
+	cfg, err := config.NewConfigFromBytes(pyprojectContent, target)
 	if err != nil {
 		return nil, errors.Wrap(err, "error on getting parsing config")
 	}

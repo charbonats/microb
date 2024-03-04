@@ -40,12 +40,13 @@ version = {attr = "example.__version__"}
 [tool.microb.target.default]
 api_version = "v1"                               # [2] Configure the microb API version used
 python_version = "3.11"                          # [3] Configure the python interpreter version to use
-build_deps = ["build-essential", "libffi-dev"]   # [4] Additional apt packages to install during build
-env = { "FOO": "bar" }                           # [5] Additional environment variables to set in final image
-indices = [{ "url": "https://pypi.org/simple" }] # [6] Configure pip index to use
-labels = { "com.example.foo": "bar" }            # [7] Additional labels to add to the final image
-entrypoint = ["micro", "run"]                    # [8] Configure the entrypoint used in the final image
-command = ["example:setup"]                      # [9] Configure the command used in the final image
+build_deps = ["build-essential", "libffi-dev"]   # [4] Additional apt packages to install during build (not installed in final image)
+system_deps = ["gettext"]                        # [5] Additional apt packages to install in final image (not installed in build image)
+env = { "FOO": "bar" }                           # [6] Additional environment variables to set in final image
+indices = [{ "url": "https://pypi.org/simple" }] # [7] Configure pip index to use
+labels = { "com.example.foo": "bar" }            # [8] Additional labels to add to the final image
+entrypoint = ["micro", "run"]                    # [9] Configure the entrypoint used in the final image
+command = ["example:setup"]                      # [10] Configure the command used in the final image
 ```
 
 [//]: # (@formatter:on)
@@ -78,11 +79,12 @@ Available configuration options are listed in the table below.
 | 2   | no       | api version of `microb` frontend. This is mainly due to future development to prevent incompatibilities                                                                                                                                                                                 | v1      | enum: [`v1`]            |
 | 3   | no      | the python interpreter version to use. Versions format is: `3`, `3.9` or `3.9.1`                                                                                                                                                                                                         | -       | string                  |
 | 4   | no       | additional `apt` packages to install before staring the build. These are not part of the final image                                                                                                                                                                                     | -       | string[]                |
-| 5   | no       | additional environment variables. These are present in the build and in the run stage                                                                                                                                                                                                    | -       | map\[string]\[string]   |
-| 6   | no       | additional list of index to consider for installing dependencies. The only required filed is `url`.                                                                                                                                                                             
-| 7   | no       | additional labels to add to the final image. These have precedence over automatically added                                                                                                                                                                                              | -       | map\[string]\[string]   |
-| 8   | no       | the entrypoint to use in the final image. This is the command that is run when the container starts                                                                                                                                                                                      | -       | string[]                |
-| 9   | no       | the command to use in the final image. This is the command that is run when the container starts if no arguments are given                                                                                                                                                               | -       | string[]                |
+| 5   | no       | additional `apt` packages to install in the final image. These are not part of the build image                                                                                                                                                                                           | -       | string[]                |
+| 6   | no       | additional environment variables. These are present in the build and in the run stage                                                                                                                                                                                                    | -       | map\[string]\[string]   |
+| 7   | no       | additional list of index to consider for installing dependencies. The only required filed is `url`.        | -       | []Index            |                                                                                                                                                                      
+| 8   | no       | additional labels to add to the final image. These have precedence over automatically added                                                                                                                                                                                              | -       | map\[string]\[string]   |
+| 9   | no       | the entrypoint to use in the final image. This is the command that is run when the container starts                                                                                                                                                                                      | -       | string[]                |
+| 10   | no       | the command to use in the final image. This is the command that is run when the container starts if no arguments are given                                                                                                                                                               | -       | string[]                |
 
 #### Index
 
