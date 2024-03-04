@@ -37,7 +37,7 @@ py-modules = ["example"]
 [tool.setuptools.dynamic]
 version = {attr = "example.__version__"}
 
-[tool.microb.default]
+[tool.microb.target.default]
 api_version = "v1"                               # [2] Configure the microb API version used
 python_version = "3.11"                          # [3] Configure the python interpreter version to use
 build_deps = ["build-essential", "libffi-dev"]   # [4] Additional apt packages to install during build
@@ -64,7 +64,7 @@ in the `pyproject.toml`, as this is independent of the used builder cli.
 
 The `pyproject.toml` file is a standard file for python projects. It is used to configure the project and its dependencies.
 
-Several build configurations can be defined in a single `pyproject.toml`. Each build configuration is defined in a separate section under `[tool.microb]`. The default build configuration is defined under `[tool.microb.default]`.
+Several build configurations can be defined in a single `pyproject.toml`. Each build configuration is defined in a separate section under `[tool.microb.target]`. The default build configuration is defined under `[tool.microb.target.default]`.
 
 The frontend is compatible with linux, windows and mac. It also supports various cpu architectures.
 Currently `i386`, `amd64`, `arm/v6`, `arm/v7`, `arm64/v8` are supported. Buildkit automatically picks the right version
