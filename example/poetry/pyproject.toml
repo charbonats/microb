@@ -7,13 +7,13 @@ authors = ["Guillaume Charbonnier <guillaume.charbonnier@araymond.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10"
+python = ">=3.10"  # IMPORTANT: caret notation is not supported for python version
 nats-py = "^2.7.2"
 
 [tool.microb.target.default]
 flavor = "alpine"
 requirements = "requirements.lock"
-command = ["python", "-m", "python_journey"]
+command = ["python", "-m", "poetry_example"]
 
 [build-system]
 requires = ["poetry-core"]
