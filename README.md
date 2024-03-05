@@ -253,11 +253,11 @@ The following arguments are supported running the frontend:
 | filename   |        path to pyproject.toml         |  `string` | `"pyproject.toml"` |
 
 For instance to show the created equivalent Dockerfile, use the
-command `go run ./cmd/microb/main.go -dockerfile -filename example/minimal/pyproject.toml`.
+command `go run ./cmd/microb/main.go -dockerfile -filename example/debian/pyproject.toml`.
 
 ## Example generated Dockerfile
 
-The example present in [example/minimal](example/minimal) contains a [`pyproject.toml`](example/minimal/pyproject.toml) file. The dockerfile produced by `microb` is the following:
+The example present in [example/debian](example/debian) contains a [`pyproject.toml`](example/debian/pyproject.toml) file. The dockerfile produced by `microb` is the following:
 
 ```Dockerfile
 FROM docker.io/python:3.11 AS builder

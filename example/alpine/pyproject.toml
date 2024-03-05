@@ -1,0 +1,48 @@
+#syntax=gucharbon/microb
+[project]
+name = "my_example"
+authors = [
+    {name = "Guillaume Charbonnier", email = "gu.charbon@gmail.com"},
+    {name = "Someone else", email = "someone.else@gmail.com"},
+]
+requires-python = ">=3.8,<3.12"
+dependencies = [
+    "nats-py",
+    "nats-micro@git+ssh://git@github.com/charbonats/nats-micro.git",
+    "nkeys"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = [
+    "nats-test-server",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+]
+
+[tool.setuptools]
+py-modules = ["example"]
+
+[tool.setuptools.dynamic]
+version = {attr = "example.__version__"}
+
+[tool.microb.target.default]
+flavor = "alpine"
+system_deps = ["gettext"]
+build_deps = ["gcc", "python3-dev", "musl-dev"]
+indices = [
+    { "url" = "https://pypi.org/simple" }
+]
+entrypoint = ["micro", "run"]
+command = ["example:setup"]
+env = { "FOO" = "bar" }
+requirements = "requirements.txt"
+labels = { "com.example.foo" = "${TEST:-World}" }
+copy_files = [
+    { "src" = "file.txt", "dst" = "/file.txt" },
+    { "from" = "docker.io/nats:2.10", "src" = "/nats-server", "dst" = "/nats-server" },
+]
+add_files = [
+    { "src" = "https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/reference.md", "dst" = "/reference.md" },
+]

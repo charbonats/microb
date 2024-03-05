@@ -12,7 +12,13 @@ import (
 
 func buildStage(c *config.Config, options *Options) string {
 	dockerfile := fromBuilder(c)
-	dockerfile += installBuildDeps(c)
+	if c.Flavor == "debian" {
+		dockerfile += installBuildDepsApt(c, options.RequirementsUseSsh)
+	} else if c.Flavor == "alpine" {
+		dockerfile += installBuildDepsApk(c, options.RequirementsUseSsh)
+	} else {
+		log.Fatalf("unsupported flavor: %s", c.Flavor)
+	}
 	dockerfile += env(utils.Union(defaultEnvs, c.Env), options.Placeholders)
 	dockerfile += copyBeforeBuild(c)
 	dockerfile += addBeforeBuild(c)
@@ -27,12 +33,18 @@ func buildStage(c *config.Config, options *Options) string {
 }
 
 func fromBuilder(c *config.Config) string {
-	line := fmt.Sprintf("FROM docker.io/python:%s AS builder\n", c.PythonVersion)
+	tag := c.PythonVersion
+	if c.Flavor == "alpine" {
+		tag += "-alpine"
+	}
+	line := fmt.Sprintf("FROM docker.io/python:%s AS builder\n", tag)
 	return line
 }
 
-func installBuildDeps(c *config.Config) string {
+func updateBuildDeps(c *config.Config, requirementsUseSsh bool) []string {
 	needJq := false
+	needGit := false
+	needOpenssh := false
 	if len(c.Indices) > 0 {
 		for _, index := range c.Indices {
 			if index.UsernameSecret != "" || index.PasswordSecret != "" {
@@ -41,28 +53,86 @@ func installBuildDeps(c *config.Config) string {
 			}
 		}
 	}
+	deps := make([]string, len(c.BuildDeps))
+	copy(deps, c.BuildDeps)
 	if needJq {
-		if len(c.BuildDeps) == 0 {
-			c.BuildDeps = append(c.BuildDeps, "jq")
+		if len(deps) == 0 {
+			deps = append(deps, "jq")
 		} else {
 			found := false
-			for _, dep := range c.BuildDeps {
+			for _, dep := range deps {
 				if dep == "jq" {
 					found = true
 					break
 				}
 			}
 			if !found {
-				c.BuildDeps = append(c.BuildDeps, "jq")
+				deps = append(deps, "jq")
 			}
 		}
 	}
-	if len(c.BuildDeps) == 0 {
+	for _, d := range c.Dependencies {
+		if strings.Contains(d, "git+") {
+			needGit = true
+		}
+		if strings.Contains(d, "git+ssh") {
+			needOpenssh = true
+		}
+	}
+	if needGit || requirementsUseSsh {
+		if len(deps) == 0 {
+			deps = append(deps, "git")
+		} else {
+			found := false
+			for _, dep := range deps {
+				if dep == "git" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				deps = append(deps, "git")
+			}
+		}
+	}
+	if needOpenssh || requirementsUseSsh {
+		if len(deps) == 0 {
+			deps = append(deps, "openssh-client")
+		} else {
+			found := false
+			for _, dep := range deps {
+				if dep == "openssh-client" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				deps = append(deps, "openssh-client")
+			}
+		}
+	}
+	return deps
+}
+
+func installBuildDepsApt(c *config.Config, requirementsUseSsh bool) string {
+	deps := updateBuildDeps(c, requirementsUseSsh)
+	if len(deps) == 0 {
 		return ""
 	}
 	line := fmt.Sprintf("RUN %s ", aptCacheMount)
 	line += "apt-get update && apt-get install -y --no-install-recommends "
-	line += strings.Join(c.BuildDeps, " ")
+	line += strings.Join(deps, " ")
+	return line
+}
+
+func installBuildDepsApk(c *config.Config, requirementsUseSsh bool) string {
+	deps := updateBuildDeps(c, requirementsUseSsh)
+	if len(deps) == 0 {
+		return ""
+	}
+	line := fmt.Sprintf("RUN %s ", apkCacheMount)
+	line += "apk add "
+	line += strings.Join(deps, " ")
 	return line
 }
 
@@ -141,6 +211,9 @@ func indices(c *config.Config) string {
 }
 
 func installPythonDeps(c *config.Config) string {
+	if len(c.Dependencies) == 0 {
+		return ""
+	}
 	line := "\n"
 	line += fmt.Sprintf("RUN %s", pipCacheMount)
 	if len(c.Indices) > 0 {

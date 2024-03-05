@@ -13,10 +13,16 @@ import (
 
 func runStage(c *config.Config, options *Options) string {
 	dockerfile := fromFinal(c)
-	dockerfile += installSystemDeps(c)
+	if c.Flavor == "debian" {
+		dockerfile += installSystemDepsApt(c)
+	} else if c.Flavor == "alpine" {
+		dockerfile += installSystemDepsApk(c)
+	} else {
+		log.Fatalf("unsupported flavor: %s", c.Flavor)
+	}
 	dockerfile += nonRootUser(c)
-	dockerfile += copy(c)
-	dockerfile += add(c)
+	dockerfile += copyFiles(c)
+	dockerfile += addFiles(c)
 	dockerfile += entrypoint(c)
 	dockerfile += env(c.Env, options.Placeholders)
 	dockerfile += labels(utils.Union(defaulLabels, c.Labels), options.Placeholders)
@@ -26,11 +32,15 @@ func runStage(c *config.Config, options *Options) string {
 
 func fromFinal(c *config.Config) string {
 	line := "\n"
-	line += fmt.Sprintf("FROM python:%s-slim\n", c.PythonVersion)
+	variant := "slim"
+	if c.Flavor == "alpine" {
+		variant = "alpine"
+	}
+	line += fmt.Sprintf("FROM python:%s-%s\n", c.PythonVersion, variant)
 	return line
 }
 
-func installSystemDeps(c *config.Config) string {
+func installSystemDepsApt(c *config.Config) string {
 	line := "\n"
 	if len(c.SystemDeps) > 0 {
 		line += "RUN apt-get update && apt-get install -y --no-install-recommends "
@@ -42,9 +52,25 @@ func installSystemDeps(c *config.Config) string {
 	return line
 }
 
+func installSystemDepsApk(c *config.Config) string {
+	line := "\n"
+	if len(c.SystemDeps) > 0 {
+		line += "RUN apk add --no-cache "
+		for _, dep := range c.SystemDeps {
+			line += fmt.Sprintf(" %s ", dep)
+		}
+		line += "\n"
+	}
+	return line
+}
+
 func nonRootUser(c *config.Config) string {
 	line := "\n"
-	line += "RUN useradd --uid=65532 --user-group --home-dir=/home/nonroot --create-home nonroot\n"
+	if c.Flavor == "alpine" {
+		line += "RUN addgroup 65532 && adduser -u 65532 -G 65532 -h /home/nonroot -D nonroot\n"
+	} else {
+		line += "RUN useradd --uid=65532 --user-group --home-dir=/home/nonroot --create-home nonroot\n"
+	}
 	line += "USER 65532:65532\n"
 	return line
 }
@@ -96,12 +122,10 @@ func authors(c *config.Config) string {
 	return line
 }
 
-func copy(c *config.Config) string {
+func copyFiles(c *config.Config) string {
 	line := "\n"
-	if len(c.Dependencies) > 0 {
-		line += "COPY --from=builder /root/.local /home/nonroot/.local\n"
-		line += "ENV PATH=$PATH:/home/nonroot/.local/bin\n"
-	}
+	line += "COPY --from=builder /root/.local /home/nonroot/.local\n"
+	line += "ENV PATH=$PATH:/home/nonroot/.local/bin\n"
 	if len(c.CopyFiles) > 0 {
 		line += "\n"
 		for _, f := range c.CopyFiles {
@@ -115,7 +139,7 @@ func copy(c *config.Config) string {
 	return line
 }
 
-func add(c *config.Config) string {
+func addFiles(c *config.Config) string {
 	line := "\n"
 	if len(c.AddFiles) > 0 {
 		line += "\n"

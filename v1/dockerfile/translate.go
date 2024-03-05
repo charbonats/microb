@@ -4,13 +4,14 @@ import (
 	"github.com/charbonats/microbuild/v1/config"
 )
 
-const pipCacheMount = "--mount=type=cache,target=/root/.cache"
+const pipCacheMount = " --mount=type=cache,target=/root/.cache"
 
 // Apt needs exclusive access to its data, so the caches use the option sharing=locked,
 // which will make sure multiple parallel builds using the same cache mount will wait for
 // each other and not access the same cache files at the same time.
 // See https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/reference.md#example-cache-apt-packages
-const aptCacheMount = "--mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,sharing=locked"
+const aptCacheMount = " --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,sharing=locked"
+const apkCacheMount = " --mount=type=cache,target=/var/cache/apk,sharing=locked"
 const sshMount = " --mount=type=ssh,required=true"
 
 var defaultEnvs = map[string]string{

@@ -48,6 +48,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 				return nil, err
 			}
 			return &Config{
+				Flavor:        "debian",
 				Name:          pyproject.Project.Name,
 				Authors:       pyproject.Project.Authors,
 				PythonVersion: pythonVersion,
@@ -58,6 +59,15 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 	appConfig, ok := pyproject.Tool.Microb.Target[target]
 	if !ok {
 		return nil, fmt.Errorf("target %s not found in pyproject.toml", target)
+	}
+	// Validate the build flavor
+	switch appConfig.Flavor {
+	case "":
+		appConfig.Flavor = "debian"
+	case "debian", "alpine":
+		// Do nothing
+	default:
+		return nil, fmt.Errorf("flavor %s not supported", appConfig.Flavor)
 	}
 	pythonVersion, err := findVersion(requiresPython, appConfig.PythonVersion)
 	if err != nil {
@@ -77,6 +87,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		}
 	}
 	config := Config{
+		Flavor:               appConfig.Flavor,
 		Name:                 pyproject.Project.Name,
 		Authors:              pyproject.Project.Authors,
 		PythonVersion:        pythonVersion,
@@ -101,6 +112,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 // A config is obtained from merging information found
 // at the project level and the target level.
 type Config struct {
+	Flavor               string            // Flavor of the build ("debian" or "alpine")
 	Name                 string            // Name of the project
 	Authors              []Author          // Authors of the project
 	PythonVersion        string            // Python version to use
@@ -184,6 +196,7 @@ type Microb struct {
 // MicrobTarget is a struct that represents a build target.
 // All fields are optional and will be filled with default values if omitted.
 type MicrobTarget struct {
+	Flavor               string            `toml:"flavor"`
 	Entrypoint           []string          `toml:"entrypoint"`
 	Command              []string          `toml:"command"`
 	PythonVersion        string            `toml:"python_version"`
