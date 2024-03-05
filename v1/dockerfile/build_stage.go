@@ -32,6 +32,31 @@ func fromBuilder(c *config.Config) string {
 }
 
 func installBuildDeps(c *config.Config) string {
+	needJq := false
+	if len(c.Indices) > 0 {
+		for _, index := range c.Indices {
+			if index.UsernameSecret != "" || index.PasswordSecret != "" {
+				needJq = true
+				break
+			}
+		}
+	}
+	if needJq {
+		if len(c.BuildDeps) == 0 {
+			c.BuildDeps = append(c.BuildDeps, "jq")
+		} else {
+			found := false
+			for _, dep := range c.BuildDeps {
+				if dep == "jq" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				c.BuildDeps = append(c.BuildDeps, "jq")
+			}
+		}
+	}
 	if len(c.BuildDeps) == 0 {
 		return ""
 	}
@@ -78,6 +103,18 @@ func indices(c *config.Config) string {
 		if err != nil {
 			log.Fatal(err)
 		}
+		replaceUser := ""
+		replacePassword := ""
+		if index.UsernameSecret != "" {
+			userSecretFile := fmt.Sprintf("/run/secrets/%s", index.UsernameSecret)
+			replaceUser = fmt.Sprintf("$(echo -n $(cat %s) | jq -sRr @uri)", userSecretFile)
+			index.Username = "REPLACE_USER"
+		}
+		if index.PasswordSecret != "" {
+			passSecretFile := fmt.Sprintf("/run/secrets/%s", index.PasswordSecret)
+			replacePassword = fmt.Sprintf("$(echo -n $(cat %s) | jq -sRr @uri)", passSecretFile)
+			index.Password = "REPLACE_PASSWORD"
+		}
 
 		if len(strings.TrimSpace(index.Username)) != 0 && len(strings.TrimSpace(index.Password)) == 0 {
 			indexUrl.User = url.User(index.Username)
@@ -86,11 +123,17 @@ func indices(c *config.Config) string {
 		if len(strings.TrimSpace(index.Username)) != 0 && len(strings.TrimSpace(index.Password)) != 0 {
 			indexUrl.User = url.UserPassword(index.Username, index.Password)
 		}
-
-		indices += fmt.Sprintf(" --extra-index-url %s", indexUrl.String())
+		indexUrlString := indexUrl.String()
+		if replaceUser != "" {
+			indexUrlString = strings.Replace(indexUrlString, "REPLACE_USER", replaceUser, 1)
+		}
+		if replacePassword != "" {
+			indexUrlString = strings.Replace(indexUrlString, "REPLACE_PASSWORD", replacePassword, 1)
+		}
+		indices += fmt.Sprintf(" --extra-index-url \"%s\"", indexUrlString)
 
 		if index.Trust {
-			indices += fmt.Sprintf(" --trusted-host %s", indexUrl.Host)
+			indices += fmt.Sprintf(" --trusted-host \"%s\"", indexUrl.Host)
 		}
 	}
 
@@ -100,6 +143,16 @@ func indices(c *config.Config) string {
 func installPythonDeps(c *config.Config) string {
 	line := "\n"
 	line += fmt.Sprintf("RUN %s", pipCacheMount)
+	if len(c.Indices) > 0 {
+		for _, index := range c.Indices {
+			if index.PasswordSecret != "" {
+				line += fmt.Sprintf(" --mount=type=secret,id=%s", index.PasswordSecret)
+			}
+			if index.UsernameSecret != "" {
+				line += fmt.Sprintf(" --mount=type=secret,id=%s", index.UsernameSecret)
+			}
+		}
+	}
 	useSsh := false
 	for _, d := range c.Dependencies {
 		if strings.Contains(d, "git+ssh") {
@@ -121,6 +174,16 @@ func installPythonDepsFromRequirements(c *config.Config, useSsh bool) string {
 	line += fmt.Sprintf("COPY %s /requirements.txt", c.Requirements)
 	line += "\n"
 	line += fmt.Sprintf("RUN %s", pipCacheMount)
+	if len(c.Indices) > 0 {
+		for _, index := range c.Indices {
+			if index.PasswordSecret != "" {
+				line += fmt.Sprintf(" --mount=type=secret,id=%s", index.PasswordSecret)
+			}
+			if index.UsernameSecret != "" {
+				line += fmt.Sprintf(" --mount=type=secret,id=%s", index.UsernameSecret)
+			}
+		}
+	}
 	if useSsh {
 		line += sshMount
 		line += " GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'"

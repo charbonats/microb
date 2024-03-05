@@ -140,10 +140,12 @@ type Add struct {
 // Trust is optional and can be used to skip certificate verification.
 // It is not recommended to use trust unless you are sure the index is owned by you or a trusted party.
 type Index struct {
-	Url      string `toml:"url"`
-	Username string `toml:"username"`
-	Password string `toml:"password"`
-	Trust    bool   `toml:"trust"`
+	Url            string `toml:"url"`
+	Username       string `toml:"username"`
+	UsernameSecret string `toml:"username_secret"`
+	Password       string `toml:"password"`
+	PasswordSecret string `toml:"password_secret"`
+	Trust          bool   `toml:"trust"`
 }
 
 // PyProject is a struct that represents a pyproject.toml file (partially)
