@@ -1,0 +1,20 @@
+#syntax=gucharbon/microb
+[tool.poetry]
+name = "poetry-example"
+version = "0.1.0"
+description = ""
+authors = ["Guillaume Charbonnier <guillaume.charbonnier@araymond.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+nats-py = "^2.7.2"
+
+[tool.microb.target.default]
+flavor = "alpine"
+requirements = "requirements.lock"
+command = ["python", "-m", "python_journey"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

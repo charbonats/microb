@@ -1,6 +1,6 @@
 #syntax=gucharbon/microb
 [project]
-name = "python-journey"
+name = "rye-example"
 version = "0.1.0"
 description = "Add your description here"
 authors = [
@@ -24,7 +24,7 @@ dev-dependencies = []
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/python_journey"]
+packages = ["src/rye_example"]
 
 [tool.microb.target.default]
 flavor = "alpine"

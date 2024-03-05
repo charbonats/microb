@@ -1,0 +1,2 @@
+nats-py==2.7.2 ; python_version >= "3.10" \
+    --hash=sha256:0c97b4a57bed0ef1ff9ae6c19bc115ec7ca8ede5ab3e001fd00a377056a547cf
