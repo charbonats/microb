@@ -11,15 +11,15 @@ import (
 	"mvdan.cc/sh/v3/shell"
 )
 
-func runStage(c *config.Config, placeholders map[string]string) string {
+func runStage(c *config.Config, options *Options) string {
 	dockerfile := fromFinal(c)
 	dockerfile += installSystemDeps(c)
 	dockerfile += nonRootUser(c)
 	dockerfile += copy(c)
 	dockerfile += add(c)
 	dockerfile += entrypoint(c)
-	dockerfile += env(c.Env, placeholders)
-	dockerfile += labels(utils.Union(defaulLabels, c.Labels), placeholders)
+	dockerfile += env(c.Env, options.Placeholders)
+	dockerfile += labels(utils.Union(defaulLabels, c.Labels), options.Placeholders)
 	dockerfile += authors(c)
 	return dockerfile
 }

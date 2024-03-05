@@ -65,6 +65,9 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 	}
 	dependencies := pyproject.Project.Dependencies
 	if len(appConfig.Extras) > 0 {
+		if appConfig.Requirements != "" {
+			return nil, fmt.Errorf("requirements field is not allowed when using extras")
+		}
 		for _, extra := range appConfig.Extras {
 			extraDeps, ok := pyproject.Project.OptionalDependencies[extra]
 			if !ok {
@@ -84,6 +87,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		BuildDeps:            appConfig.BuildDeps,
 		SystemDeps:           appConfig.SystemDeps,
 		Dependencies:         utils.Unique(dependencies),
+		Requirements:         appConfig.Requirements,
 		Indices:              appConfig.Indices,
 		CopyFiles:            appConfig.CopyFiles,
 		CopyFilesBeforeBuild: appConfig.CopyFilesBeforeBuild,
@@ -108,6 +112,7 @@ type Config struct {
 	SystemDeps           []string          // System dependencies (not installed during build, only installed in final image)
 	Indices              []Index           // Extra index urls to use
 	Dependencies         []string          // Dependencies to install
+	Requirements         string            // Path to requirements file
 	CopyFiles            []Copy            // Files to copy to the final image
 	CopyFilesBeforeBuild []Copy            // Files to copy to the build context before building
 	AddFiles             []Add             // Files to add to the final image
@@ -180,6 +185,7 @@ type MicrobTarget struct {
 	Entrypoint           []string          `toml:"entrypoint"`
 	Command              []string          `toml:"command"`
 	PythonVersion        string            `toml:"python_version"`
+	Requirements         string            `toml:"requirements"`
 	Indices              []Index           `toml:"indices"`
 	Extras               []string          `toml:"extras"`
 	Env                  map[string]string `toml:"environment"`

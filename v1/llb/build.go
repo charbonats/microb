@@ -58,7 +58,27 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get pyproject.toml")
 	}
-	dockerfile := dockerfile.Microb2Dockerfile(microbConfig, buildargs)
+	useSsh := false
+	if microbConfig.Requirements != "" {
+		// Need to read requirements.txt from the local context
+		// If we don't read and simply copy the requirements.txt from the local context,
+		// it will not be possible to detect whether ssh mount should be used or not.
+		requirements, err := readRequirementsTxt(ctx, c, microbConfig.Requirements)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get requirements.txt")
+		}
+		for _, line := range requirements {
+			if strings.Contains(line, "git+ssh://") {
+				useSsh = true
+				break
+			}
+		}
+	}
+	options := &dockerfile.Options{
+		Placeholders:       buildargs,
+		RequirementsUseSsh: useSsh,
+	}
+	dockerfile := dockerfile.Microb2Dockerfile(microbConfig, options)
 
 	excludes, err := readDockerIgnoreFile(ctx, c)
 
@@ -381,6 +401,21 @@ func readDockerIgnoreFile(ctx context.Context, c client.Client) ([]string, error
 	}
 
 	return excludes, nil
+}
+
+// readRequirementsTxt reads the requirements.txt file from the local context
+// and returns a slice of strings (each line in the file is a string in the slice)
+func readRequirementsTxt(ctx context.Context, c client.Client, filename string) ([]string, error) {
+	content, err := readFileFromLocal(ctx, c, localNameContext, filename, true)
+	if err != nil {
+		return nil, err
+	}
+	strSlice := bytes.Split(content, []byte("\n"))
+	var lines []string
+	for _, b := range strSlice {
+		lines = append(lines, string(b))
+	}
+	return lines, nil
 }
 
 // parseCacheOptions parses cache options from the build options

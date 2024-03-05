@@ -33,10 +33,10 @@ system_deps = ["gettext"]
 indices = [
     { "url" = "https://pypi.org/simple" }
 ]
-extras = ["test"]
 entrypoint = ["micro", "run"]
 command = ["example:setup"]
 env = { "FOO" = "bar" }
+requirements = "requirements.txt"
 labels = { "com.example.foo" = "${TEST:-World}" }
 copy_files = [
     { "src" = "file.txt", "dst" = "/file.txt" },

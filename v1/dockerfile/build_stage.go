@@ -10,13 +10,17 @@ import (
 	"github.com/charbonats/microbuild/v1/utils"
 )
 
-func buildStage(c *config.Config, placeholders map[string]string) string {
+func buildStage(c *config.Config, options *Options) string {
 	dockerfile := fromBuilder(c)
 	dockerfile += installBuildDeps(c)
-	dockerfile += env(utils.Union(defaultEnvs, c.Env), placeholders)
+	dockerfile += env(utils.Union(defaultEnvs, c.Env), options.Placeholders)
 	dockerfile += copyBeforeBuild(c)
 	dockerfile += addBeforeBuild(c)
-	dockerfile += installPythonDeps(c)
+	if c.Requirements != "" {
+		dockerfile += installPythonDepsFromRequirements(c, options.RequirementsUseSsh)
+	} else {
+		dockerfile += installPythonDeps(c)
+	}
 	dockerfile += installPythonProject(c)
 	dockerfile += clearCachedDataFromInstall(c)
 	return dockerfile
@@ -109,6 +113,19 @@ func installPythonDeps(c *config.Config) string {
 	}
 	line += fmt.Sprintf(" python -m pip install --user %s ", indices(c))
 	line += strings.Join(c.Dependencies, " ")
+	return line
+}
+
+func installPythonDepsFromRequirements(c *config.Config, useSsh bool) string {
+	line := "\n"
+	line += fmt.Sprintf("COPY %s /requirements.txt", c.Requirements)
+	line += "\n"
+	line += fmt.Sprintf("RUN %s", pipCacheMount)
+	if useSsh {
+		line += sshMount
+		line += " GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'"
+	}
+	line += fmt.Sprintf(" python -m pip install --user %s -r /requirements.txt", indices(c))
 	return line
 }
 
