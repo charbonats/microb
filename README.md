@@ -135,7 +135,7 @@ Note that when `username_secret` or `password_secret` are used, the secrets must
 docker buildx build --secret id=az_feed_token,env=AZ_FEED_TOKEN -t example -f pyproject.toml .
 ```
 
-> In the example above, the secret `az_feed_token` is provided using the value from the environment variable `AZ_FEED_TOKEN` on the host.
+> In the example above, the secret `az_feed_token` is provided using the value from the environment variable `AZ_FEED_TOKEN` on the host. Checkout https://docs.docker.com/build/building/secrets/ to learn more about build secrets. 
 
 The [example folder](example) contains a few examples how you can use `microb`.
 
