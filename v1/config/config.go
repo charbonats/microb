@@ -229,7 +229,7 @@ func findVersion(requires string, target string) (string, error) {
 			return "", fmt.Errorf("version %s does not satisfy the requirement %s", target, requires)
 		}
 	}
-	for _, target := range []string{"3.11", "3.10", "3.9", "3.8", "3.7", "3.6"} {
+	for _, target := range []string{"3.12", "3.11", "3.10", "3.9", "3.8", "3.7", "3.6"} {
 		v, err := version.NewVersion(target)
 		if err != nil {
 			log.Fatal(err)
