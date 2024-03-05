@@ -45,6 +45,10 @@ const (
 func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	buildOpts := c.BuildOpts()
 	opts := buildOpts.Opts
+	filename := opts[keyConfigPath]
+	if filename == "" {
+		filename = defaultDockerfileName
+	}
 	buildargs := utils.Filter(opts, buildArgPrefix)
 	labels := utils.Filter(opts, labelPrefix)
 	target := ""
@@ -54,31 +58,22 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 			break
 		}
 	}
-	microbConfig, err := readMicrobConfig(ctx, c, target)
+	options := &config.Options{
+		Filename:  filename,
+		Target:    target,
+		BuildArgs: buildargs,
+		ReadPythonVersion: func() string {
+			return readPythonVersion(ctx, c)
+		},
+		ReadRequirements: func(name string) ([]string, error) {
+			return readRequirementsTxt(ctx, c, name)
+		},
+	}
+	microbConfig, err := readMicrobConfig(ctx, c, options)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get pyproject.toml")
 	}
-	useSsh := false
-	if microbConfig.Requirements != "" {
-		// Need to read requirements.txt from the local context
-		// If we don't read and simply copy the requirements.txt from the local context,
-		// it will not be possible to detect whether ssh mount should be used or not.
-		requirements, err := readRequirementsTxt(ctx, c, microbConfig.Requirements)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get requirements.txt")
-		}
-		for _, line := range requirements {
-			if strings.Contains(line, "git+ssh://") {
-				useSsh = true
-				break
-			}
-		}
-	}
-	options := &dockerfile.Options{
-		Placeholders:       buildargs,
-		RequirementsUseSsh: useSsh,
-	}
-	dockerfile := dockerfile.Microb2Dockerfile(microbConfig, options)
+	dockerfile := dockerfile.Microb2Dockerfile(microbConfig, options.BuildArgs)
 
 	excludes, err := readDockerIgnoreFile(ctx, c)
 
@@ -267,21 +262,16 @@ func buildImage(ctx context.Context, c client.Client, dockerfile string, convert
 
 // readMicrobConfig reads the pyproject.toml file from the local context and
 // returns a config.Config
-func readMicrobConfig(ctx context.Context, c client.Client, target string) (*config.Config, error) {
-	opts := c.BuildOpts().Opts
-	filename := opts[keyConfigPath]
-	if filename == "" {
-		filename = defaultDockerfileName
-	}
+func readMicrobConfig(ctx context.Context, c client.Client, options *config.Options) (*config.Config, error) {
 
 	name := "load definition"
-	if filename != defaultDockerfileName {
-		name += " from " + filename
+	if options.Filename != defaultDockerfileName {
+		name += " from " + options.Filename
 	}
 
 	src := llb.Local(
 		localNameConfig,
-		llb.IncludePatterns([]string{filename}),
+		llb.IncludePatterns([]string{options.Filename}),
 		llb.SessionID(c.BuildOpts().SessionID),
 		llb.SharedKeyHint(defaultDockerfileName),
 		dockerfile2llb.WithInternalName(name),
@@ -306,13 +296,12 @@ func readMicrobConfig(ctx context.Context, c client.Client, target string) (*con
 
 	var pyprojectContent []byte
 	pyprojectContent, err = ref.ReadFile(ctx, client.ReadRequest{
-		Filename: filename,
+		Filename: options.Filename,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read pyproject.toml")
 	}
-	defaultPythonVersion := readPythonVersion(ctx, c)
-	cfg, err := config.NewConfigFromBytes(pyprojectContent, target, defaultPythonVersion)
+	cfg, err := config.NewConfigFromBytes(pyprojectContent, options)
 	if err != nil {
 		return nil, errors.Wrap(err, "error on getting parsing config")
 	}

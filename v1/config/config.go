@@ -2,115 +2,134 @@ package config
 
 import (
 	"fmt"
-	"io"
-	"log"
-	"net/mail"
-	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/charbonats/microbuild/v1/utils"
-	"github.com/hashicorp/go-version"
 )
 
+// Options is a struct that represents options for the build process.
+// Options are deduced from the build context, not from the pyproject.toml file.
+type Options struct {
+	Filename          string
+	Target            string
+	BuildArgs         map[string]string
+	ReadRequirements  func(name string) ([]string, error)
+	ReadPythonVersion func() string
+}
+
 // NewConfigFromFile creates a new Config from a file path and a target.
-func NewConfigFromFile(path string, target string, defaultPythonVersion string) (*Config, error) {
-	file, err := os.Open(path)
+func NewConfigFromFile(path string, options *Options) (*Config, error) {
+	content, err := utils.ReadFileAsBytes(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewConfigFromFile: %w", err)
 	}
-	defer file.Close()
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	return NewConfigFromBytes(content, target, defaultPythonVersion)
+	return NewConfigFromBytes(content, options)
 }
 
 // NewConfigFromBytes creates a new Config from a byte array and a target.
 // Byte array is expected to be UTF-8 encoded TOML data from a pyproject.toml file.
-func NewConfigFromBytes(data []byte, target string, defaultPythonVersion string) (*Config, error) {
+func NewConfigFromBytes(data []byte, options *Options) (*Config, error) {
 	var pyproject PyProject
+	// Start by decoding the pyproject.toml file
 	_, err := toml.Decode(string(data), &pyproject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewConfigFromBytes: failed to decode pyproject.toml content: %w", err)
 	}
+	// Get the constraints on Python versions by the project
 	requiresPython := pyproject.Project.RequiresPython
+	// If we're using poetry, we need to check the python version constraints from there
 	if pyproject.Tool.Poetry.Name != "" {
 		requiresPython = pyproject.Tool.Poetry.PythonRequires()
 	}
+	target := options.Target
 	// If no target is specified
 	if target == "" {
 		// Look for the first target in the microb config
-		for name := range pyproject.Tool.Microb.Target {
-			target = name
-			break
-		}
+		defaultTarget, ok := defaultTarget(&pyproject.Tool.Microb)
 		// If there is still no target found, use default values
-		if target == "" {
-			pythonVersion, err := findVersion(requiresPython, defaultPythonVersion)
+		if !ok {
+			pythonVersion, err := GetPythonVersion(requiresPython, options.ReadPythonVersion())
 			if err != nil {
 				return nil, err
 			}
+			dependenciesUseSsh := isUsingSsh(pyproject.Project.Dependencies)
+			dependenciesUseGit := isUsingGit(pyproject.Project.Dependencies)
 			return &Config{
-				Flavor:        "debian",
-				Name:          pyproject.Project.Name,
-				Authors:       pyproject.Project.Authors,
-				PythonVersion: pythonVersion,
-				Dependencies:  pyproject.Project.Dependencies,
+				Flavor:             DefaultFlavor(),
+				Name:               pyproject.Project.Name,
+				Authors:            pyproject.Project.Authors,
+				PythonVersion:      pythonVersion,
+				Dependencies:       pyproject.Project.Dependencies,
+				DependenciesUseSsh: dependenciesUseSsh,
+				DependenciesUseGit: dependenciesUseGit,
 			}, nil
+			// Else use the first target found
+		} else {
+			target = defaultTarget
 		}
 	}
-	appConfig, ok := pyproject.Tool.Microb.Target[target]
+	// Get the target config
+	targetConfig, ok := pyproject.Tool.Microb.Target[target]
 	if !ok {
-		return nil, fmt.Errorf("target %s not found in pyproject.toml", target)
+		return nil, fmt.Errorf("NewConfigFromBytes: target %s not found in pyproject.toml", target)
 	}
 	// Validate the build flavor
-	switch appConfig.Flavor {
-	case "":
-		appConfig.Flavor = "debian"
-	case "debian", "alpine":
-		// Do nothing
-	default:
-		return nil, fmt.Errorf("flavor %s not supported", appConfig.Flavor)
+	targetConfig.Flavor, ok = Flavor(targetConfig.Flavor)
+	if !ok {
+		return nil, fmt.Errorf("NewConfigFromBytes: target %s uses unknown flavor %s", target, targetConfig.Flavor)
 	}
-	if appConfig.PythonVersion == "" {
-		appConfig.PythonVersion = defaultPythonVersion
+	// If no python version is specified, use the default
+	if targetConfig.PythonVersion == "" {
+		targetConfig.PythonVersion = options.ReadPythonVersion()
 	}
-	pythonVersion, err := findVersion(requiresPython, appConfig.PythonVersion)
+	// Validate the python version
+	pythonVersion, err := GetPythonVersion(requiresPython, targetConfig.PythonVersion)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("NewConfigFromBytes: failed to get python verson for target %s: %w", target, err)
 	}
-	dependencies := pyproject.Project.Dependencies
-	if len(appConfig.Extras) > 0 {
-		if appConfig.Requirements != "" {
-			return nil, fmt.Errorf("requirements field is not allowed when using extras")
-		}
-		for _, extra := range appConfig.Extras {
-			extraDeps, ok := pyproject.Project.OptionalDependencies[extra]
-			if !ok {
-				return nil, fmt.Errorf("extra %s not found in pyproject.toml", extra)
-			}
-			dependencies = append(dependencies, extraDeps...)
-		}
+	if targetConfig.Requirements != "" && len(targetConfig.Extras) > 0 {
+		return nil, fmt.Errorf("NewConfigFromBytes: failed to validate configuration for taget %s: using requirements is not allowed together with extras", target)
 	}
+	// Merge the dependencies with extras if any
+	dependencies, err := getPythonDeps(&pyproject, targetConfig.Extras)
+	if err != nil {
+		return nil, fmt.Errorf("NewConfigFromBytes: failed to get dependencies for target %s: %w", target, err)
+	}
+	dependenciesUseSsh := false
+	dependenciesUseGit := false
+	if targetConfig.Requirements != "" {
+		reqs, err := options.ReadRequirements(targetConfig.Requirements)
+		if err != nil {
+			return nil, fmt.Errorf("NewConfigFromBytes: failed to get requirements for target %s: %w", target, err)
+		}
+		dependenciesUseSsh = isUsingSsh(reqs)
+		dependenciesUseGit = isUsingGit(reqs)
+	} else {
+		dependenciesUseSsh = isUsingSsh(dependencies)
+		dependenciesUseGit = isUsingGit(dependencies)
+	}
+	buildDeps := getBuildDeps(targetConfig.Indices, targetConfig.BuildDeps, dependenciesUseSsh, dependenciesUseGit)
 	config := Config{
-		Flavor:               appConfig.Flavor,
+		Flavor:               targetConfig.Flavor,
 		Name:                 pyproject.Project.Name,
 		Authors:              pyproject.Project.Authors,
 		PythonVersion:        pythonVersion,
-		Entrypoint:           appConfig.Entrypoint,
-		Command:              appConfig.Command,
-		Env:                  appConfig.Env,
-		Labels:               appConfig.Labels,
-		BuildDeps:            appConfig.BuildDeps,
-		SystemDeps:           appConfig.SystemDeps,
-		Dependencies:         utils.Unique(dependencies),
-		Requirements:         appConfig.Requirements,
-		Indices:              appConfig.Indices,
-		CopyFiles:            appConfig.CopyFiles,
-		CopyFilesBeforeBuild: appConfig.CopyFilesBeforeBuild,
-		AddFiles:             appConfig.AddFiles,
-		AddFilesBeforeBuild:  appConfig.AddFilesBeforeBuild,
+		Entrypoint:           targetConfig.Entrypoint,
+		Command:              targetConfig.Command,
+		Env:                  targetConfig.Env,
+		Labels:               targetConfig.Labels,
+		BuildDeps:            buildDeps,
+		SystemDeps:           targetConfig.SystemDeps,
+		Dependencies:         dependencies,
+		Requirements:         targetConfig.Requirements,
+		DependenciesUseSsh:   dependenciesUseSsh,
+		DependenciesUseGit:   dependenciesUseGit,
+		Indices:              targetConfig.Indices,
+		CopyFiles:            targetConfig.CopyFiles,
+		CopyFilesBeforeBuild: targetConfig.CopyFilesBeforeBuild,
+		AddFiles:             targetConfig.AddFiles,
+		AddFilesBeforeBuild:  targetConfig.AddFilesBeforeBuild,
 	}
 	return &config, nil
 }
@@ -131,6 +150,8 @@ type Config struct {
 	SystemDeps           []string          // System dependencies (not installed during build, only installed in final image)
 	Indices              []Index           // Extra index urls to use
 	Dependencies         []string          // Dependencies to install
+	DependenciesUseSsh   bool              // Whether ssh is required to install dependencies or not
+	DependenciesUseGit   bool              // Whether git is required to install dependencies or not
 	Requirements         string            // Path to requirements file
 	CopyFiles            []Copy            // Files to copy to the final image
 	CopyFilesBeforeBuild []Copy            // Files to copy to the build context before building
@@ -195,78 +216,6 @@ type Tool struct {
 	Poetry Poetry `toml:"poetry"`
 }
 
-type Poetry struct {
-	Authors      []PoetryAuthor              `toml:"authors"`
-	Name         string                      `toml:"name"`
-	Description  string                      `toml:"description"`
-	Dependencies map[string]PoetryDependency `toml:"dependencies"`
-}
-
-func (p *Poetry) GetAuthors() []Author {
-	var authors []Author
-	for _, a := range p.Authors {
-		authors = append(authors, a.ToAuthor())
-	}
-	return authors
-}
-
-func (p *Poetry) PythonRequires() string {
-	if v, ok := p.Dependencies["python"]; ok {
-		return v.version
-	}
-	return ""
-}
-
-type PoetryAuthor struct {
-	Name  string `toml:"name"`
-	Email string `toml:"email"`
-}
-
-func (p *PoetryAuthor) ToAuthor() Author {
-	return Author{
-		Name:  p.Name,
-		Email: p.Email,
-	}
-}
-
-func (p *PoetryAuthor) UnmarshalTOML(value interface{}) error {
-	text, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("expected string, got %T", value)
-	}
-	addr, err := mail.ParseAddress(text)
-	p.Email = addr.Address
-	p.Name = addr.Name
-	return err
-}
-
-type PoetryDependency struct {
-	version string
-}
-
-func (p *PoetryDependency) UnmarshalTOML(value interface{}) error {
-	text, ok := value.(string)
-	if ok {
-		p.version = text
-		return nil
-	}
-	mapping, ok := value.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("expected string or map, got %T", value)
-	}
-	if v, ok := mapping["version"]; ok {
-		p.version = v.(string)
-	} else {
-		return fmt.Errorf("version field is required")
-	}
-	return nil
-}
-
-var (
-	_ toml.Unmarshaler = (*PoetryAuthor)(nil)
-	_ toml.Unmarshaler = (*PoetryDependency)(nil)
-)
-
 // Microb is a struct that represents a microb section in a pyproject.toml file.
 // For now, it only contains a map of targets.
 type Microb struct {
@@ -293,30 +242,72 @@ type MicrobTarget struct {
 	AddFilesBeforeBuild  []Add             `toml:"add_files_before_build"`
 }
 
-func findVersion(requires string, target string) (string, error) {
-	constraints, err := version.NewConstraint(requires)
-	if err != nil {
-		return "", err
+func getBuildDeps(
+	indices []Index,
+	buildDeps []string,
+	dependenciesUseSsh bool,
+	dependenciesUseGit bool,
+) []string {
+	deps := make([]string, len(buildDeps))
+	copy(deps, buildDeps)
+	if dependenciesUseSsh {
+		deps = append(deps, "openssh-client")
 	}
-	if target != "" {
-		v, err := version.NewVersion(target)
-		if err != nil {
-			return "", fmt.Errorf("version %s is not valid", target)
-		}
-		if constraints.Check(v) {
-			return target, nil
-		} else {
-			return "", fmt.Errorf("version %s does not satisfy the requirement %s", target, requires)
-		}
+	if dependenciesUseGit {
+		deps = append(deps, "git")
 	}
-	for _, target := range []string{"3.12", "3.11", "3.10", "3.9", "3.8", "3.7", "3.6"} {
-		v, err := version.NewVersion(target)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if constraints.Check(v) {
-			return target, nil
+	needJq := false
+	if len(indices) > 0 {
+		for _, index := range indices {
+			if index.UsernameSecret != "" || index.PasswordSecret != "" {
+				needJq = true
+				break
+			}
 		}
 	}
-	return "", fmt.Errorf("no version satisfies the requirement %s", requires)
+	if needJq {
+		deps = append(deps, "jq")
+	}
+	return deps
+}
+
+func getPythonDeps(pyproject *PyProject, extras []string) ([]string, error) {
+	dependencies := make([]string, len(pyproject.Project.Dependencies))
+	copy(dependencies, pyproject.Project.Dependencies)
+	if len(extras) > 0 {
+		for _, extra := range extras {
+			extraDeps, ok := pyproject.Project.OptionalDependencies[extra]
+			if !ok {
+				return nil, fmt.Errorf("extra %s not found in pyproject.toml", extra)
+			}
+			dependencies = append(dependencies, extraDeps...)
+		}
+	}
+	return utils.Unique(dependencies), nil
+}
+
+func isUsingSsh(requirements []string) bool {
+	for _, line := range requirements {
+		if strings.Contains(line, "git+ssh://") {
+			return true
+		}
+	}
+	return false
+}
+
+func isUsingGit(requirements []string) bool {
+	for _, line := range requirements {
+		if strings.Contains(line, "git+") {
+			return true
+		}
+	}
+	return false
+}
+
+// DefaultTarget returns the first target found in the microb section.
+func defaultTarget(m *Microb) (string, bool) {
+	for name := range m.Target {
+		return name, true
+	}
+	return "", false
 }

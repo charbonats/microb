@@ -27,20 +27,12 @@ var defaulLabels = map[string]string{
 	"microb.version":                       "v1",
 }
 
-type Options struct {
-	Placeholders       map[string]string
-	RequirementsUseSsh bool
-}
-
 // Microb2Dockerfile translates a microb config into a Dockerfile.
 func Microb2Dockerfile(
 	c *config.Config,
-	options *Options,
+	placeholders map[string]string,
 ) string {
-	if options == nil {
-		options = &Options{}
-	}
-	dockerfile := buildStage(c, options)
-	dockerfile += runStage(c, options)
+	dockerfile := buildStage(c, placeholders)
+	dockerfile += runStage(c, placeholders)
 	return dockerfile
 }

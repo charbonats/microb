@@ -1,0 +1,7 @@
+nats-py
+nats-micro @ git+ssh://git@github.com/charbonats/nats-micro.git
+nkeys
+nats-test-server
+pytest
+pytest-asyncio
+pytest-cov

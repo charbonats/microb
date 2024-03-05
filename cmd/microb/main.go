@@ -62,7 +62,7 @@ func main() {
 
 // printDockerfile prints the Dockerfile to the given writer
 func printDockerfile(filename string, app string, out io.Writer) error {
-	c, err := config.NewConfigFromFile(filename, app, "")
+	c, err := config.NewConfigFromFile(filename, &config.Options{Target: app})
 	if err != nil {
 		return errors.Wrap(err, "opening pyproject.toml")
 	}
@@ -73,7 +73,7 @@ func printDockerfile(filename string, app string, out io.Writer) error {
 
 // printLlb prints the LLB to the given writer
 func printLlb(filename string, app string, out io.Writer) error {
-	c, err := config.NewConfigFromFile(filename, app, "")
+	c, err := config.NewConfigFromFile(filename, &config.Options{Target: app})
 	if err != nil {
 		return errors.Wrap(err, "opening pyproject.toml")
 	}

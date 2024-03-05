@@ -11,36 +11,39 @@ import (
 	"mvdan.cc/sh/v3/shell"
 )
 
-func runStage(c *config.Config, options *Options) string {
-	dockerfile := fromFinal(c)
+func runStage(c *config.Config, placeholders map[string]string) string {
+	dockerfile := fromFinalStage(c)
 	if c.Flavor == "debian" {
-		dockerfile += installSystemDepsApt(c)
+		dockerfile += installSystemDepsWithApt(c)
 	} else if c.Flavor == "alpine" {
-		dockerfile += installSystemDepsApk(c)
+		dockerfile += installSystemDepsWithApk(c)
 	} else {
 		log.Fatalf("unsupported flavor: %s", c.Flavor)
 	}
-	dockerfile += nonRootUser(c)
+	dockerfile += createNonRootUser(c)
 	dockerfile += copyFiles(c)
 	dockerfile += addFiles(c)
-	dockerfile += entrypoint(c)
-	dockerfile += env(c.Env, options.Placeholders)
-	dockerfile += labels(utils.Union(defaulLabels, c.Labels), options.Placeholders)
-	dockerfile += authors(c)
+	dockerfile += addEntrypointAndCommand(c)
+	dockerfile += addEnvironmentVariables(c.Env, placeholders)
+	dockerfile += addLabels(utils.Union(defaulLabels, c.Labels), placeholders)
+	dockerfile += addAuthorsLabels(c)
 	return dockerfile
 }
 
-func fromFinal(c *config.Config) string {
+func fromFinalStage(c *config.Config) string {
 	line := "\n"
-	variant := "slim"
-	if c.Flavor == "alpine" {
-		variant = "alpine"
+	image := fmt.Sprintf("python:%s", c.PythonVersion)
+	switch c.Flavor {
+	case "alpine":
+		image += "-alpine"
+	case "debian":
+		image += "-slim"
 	}
-	line += fmt.Sprintf("FROM python:%s-%s\n", c.PythonVersion, variant)
+	line += fmt.Sprintf("FROM %s\n", image)
 	return line
 }
 
-func installSystemDepsApt(c *config.Config) string {
+func installSystemDepsWithApt(c *config.Config) string {
 	line := "\n"
 	if len(c.SystemDeps) > 0 {
 		line += "RUN apt-get update && apt-get install -y --no-install-recommends "
@@ -52,7 +55,7 @@ func installSystemDepsApt(c *config.Config) string {
 	return line
 }
 
-func installSystemDepsApk(c *config.Config) string {
+func installSystemDepsWithApk(c *config.Config) string {
 	line := "\n"
 	if len(c.SystemDeps) > 0 {
 		line += "RUN apk add --no-cache "
@@ -64,7 +67,7 @@ func installSystemDepsApk(c *config.Config) string {
 	return line
 }
 
-func nonRootUser(c *config.Config) string {
+func createNonRootUser(c *config.Config) string {
 	line := "\n"
 	if c.Flavor == "alpine" {
 		line += "RUN addgroup 65532 && adduser -u 65532 -G 65532 -h /home/nonroot -D nonroot\n"
@@ -75,7 +78,7 @@ func nonRootUser(c *config.Config) string {
 	return line
 }
 
-func env(envs map[string]string, placeholders map[string]string) string {
+func addEnvironmentVariables(envs map[string]string, placeholders map[string]string) string {
 	if len(envs) == 0 {
 		return ""
 	}
@@ -92,7 +95,7 @@ func env(envs map[string]string, placeholders map[string]string) string {
 	return strings.Join(lines, "\n")
 }
 
-func labels(labels map[string]string, placeholders map[string]string) string {
+func addLabels(labels map[string]string, placeholders map[string]string) string {
 	line := "\n"
 	for k, v := range labels {
 		v, err := shell.Expand(v, func(key string) string {
@@ -106,7 +109,7 @@ func labels(labels map[string]string, placeholders map[string]string) string {
 	return line
 }
 
-func authors(c *config.Config) string {
+func addAuthorsLabels(c *config.Config) string {
 	line := "\n"
 	if len(c.Authors) > 0 {
 		authors := make([]string, len(c.Authors))
@@ -153,7 +156,7 @@ func addFiles(c *config.Config) string {
 	return line
 }
 
-func entrypoint(c *config.Config) string {
+func addEntrypointAndCommand(c *config.Config) string {
 	line := "\n"
 	if len(c.Entrypoint) > 0 {
 		entrypoint, err := json.Marshal(c.Entrypoint)

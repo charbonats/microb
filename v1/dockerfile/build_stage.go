@@ -10,133 +10,60 @@ import (
 	"github.com/charbonats/microbuild/v1/utils"
 )
 
-func buildStage(c *config.Config, options *Options) string {
-	dockerfile := fromBuilder(c)
-	if c.Flavor == "debian" {
-		dockerfile += installBuildDepsApt(c, options.RequirementsUseSsh)
-	} else if c.Flavor == "alpine" {
-		dockerfile += installBuildDepsApk(c, options.RequirementsUseSsh)
-	} else {
+func buildStage(c *config.Config, placeholders map[string]string) string {
+	dockerfile := fromBuilderStage(c)
+	switch c.Flavor {
+	case "debian":
+		dockerfile += installBuildDepsWithApt(c)
+	case "alpine":
+		dockerfile += installBuildDepsWithApk(c)
+	default:
 		log.Fatalf("unsupported flavor: %s", c.Flavor)
 	}
-	dockerfile += env(utils.Union(defaultEnvs, c.Env), options.Placeholders)
-	dockerfile += copyBeforeBuild(c)
-	dockerfile += addBeforeBuild(c)
-	if c.Requirements != "" {
-		dockerfile += installPythonDepsFromRequirements(c, options.RequirementsUseSsh)
-	} else {
-		dockerfile += installPythonDeps(c)
+	dockerfile += addEnvironmentVariables(utils.Union(defaultEnvs, c.Env), placeholders)
+	dockerfile += copyFilesBeforeBuild(c)
+	dockerfile += addFilesBeforeBuild(c)
+	switch c.Requirements {
+	case "":
+		dockerfile += installPythonDepsFromPyProject(c)
+	default:
+		dockerfile += installPythonDepsFromRequirements(c)
 	}
-	dockerfile += installPythonProject(c)
-	dockerfile += clearCachedDataFromInstall(c)
+	dockerfile += installProject(c)
+	dockerfile += clearInstalledPythonLibs(c)
 	return dockerfile
 }
 
-func fromBuilder(c *config.Config) string {
-	tag := c.PythonVersion
+func fromBuilderStage(c *config.Config) string {
+	image := fmt.Sprintf("docker.io/python:%s", c.PythonVersion)
 	if c.Flavor == "alpine" {
-		tag += "-alpine"
+		image += "-alpine"
 	}
-	line := fmt.Sprintf("FROM docker.io/python:%s AS builder\n", tag)
+	line := fmt.Sprintf("FROM %s AS builder\n", image)
 	return line
 }
 
-func updateBuildDeps(c *config.Config, requirementsUseSsh bool) []string {
-	needJq := false
-	needGit := false
-	needOpenssh := false
-	if len(c.Indices) > 0 {
-		for _, index := range c.Indices {
-			if index.UsernameSecret != "" || index.PasswordSecret != "" {
-				needJq = true
-				break
-			}
-		}
-	}
-	deps := make([]string, len(c.BuildDeps))
-	copy(deps, c.BuildDeps)
-	if needJq {
-		if len(deps) == 0 {
-			deps = append(deps, "jq")
-		} else {
-			found := false
-			for _, dep := range deps {
-				if dep == "jq" {
-					found = true
-					break
-				}
-			}
-			if !found {
-				deps = append(deps, "jq")
-			}
-		}
-	}
-	for _, d := range c.Dependencies {
-		if strings.Contains(d, "git+") {
-			needGit = true
-		}
-		if strings.Contains(d, "git+ssh") {
-			needOpenssh = true
-		}
-	}
-	if needGit || requirementsUseSsh {
-		if len(deps) == 0 {
-			deps = append(deps, "git")
-		} else {
-			found := false
-			for _, dep := range deps {
-				if dep == "git" {
-					found = true
-					break
-				}
-			}
-			if !found {
-				deps = append(deps, "git")
-			}
-		}
-	}
-	if needOpenssh || requirementsUseSsh {
-		if len(deps) == 0 {
-			deps = append(deps, "openssh-client")
-		} else {
-			found := false
-			for _, dep := range deps {
-				if dep == "openssh-client" {
-					found = true
-					break
-				}
-			}
-			if !found {
-				deps = append(deps, "openssh-client")
-			}
-		}
-	}
-	return deps
-}
-
-func installBuildDepsApt(c *config.Config, requirementsUseSsh bool) string {
-	deps := updateBuildDeps(c, requirementsUseSsh)
-	if len(deps) == 0 {
+func installBuildDepsWithApt(c *config.Config) string {
+	if len(c.BuildDeps) == 0 {
 		return ""
 	}
 	line := fmt.Sprintf("RUN %s ", aptCacheMount)
 	line += "apt-get update && apt-get install -y --no-install-recommends "
-	line += strings.Join(deps, " ")
+	line += strings.Join(c.BuildDeps, " ")
 	return line
 }
 
-func installBuildDepsApk(c *config.Config, requirementsUseSsh bool) string {
-	deps := updateBuildDeps(c, requirementsUseSsh)
-	if len(deps) == 0 {
+func installBuildDepsWithApk(c *config.Config) string {
+	if len(c.BuildDeps) == 0 {
 		return ""
 	}
 	line := fmt.Sprintf("RUN %s ", apkCacheMount)
 	line += "apk add "
-	line += strings.Join(deps, " ")
+	line += strings.Join(c.BuildDeps, " ")
 	return line
 }
 
-func copyBeforeBuild(c *config.Config) string {
+func copyFilesBeforeBuild(c *config.Config) string {
 	line := ""
 	if len(c.CopyFilesBeforeBuild) > 0 {
 		line += "\n"
@@ -151,7 +78,7 @@ func copyBeforeBuild(c *config.Config) string {
 	return line
 }
 
-func addBeforeBuild(c *config.Config) string {
+func addFilesBeforeBuild(c *config.Config) string {
 	line := ""
 	if len(c.AddFilesBeforeBuild) > 0 {
 		line += "\n"
@@ -165,7 +92,7 @@ func addBeforeBuild(c *config.Config) string {
 	return line
 }
 
-func indices(c *config.Config) string {
+func formatPipIndices(c *config.Config) string {
 	indices := "--retries 2"
 
 	for _, index := range c.Indices {
@@ -210,7 +137,7 @@ func indices(c *config.Config) string {
 	return indices
 }
 
-func installPythonDeps(c *config.Config) string {
+func installPythonDepsFromPyProject(c *config.Config) string {
 	if len(c.Dependencies) == 0 {
 		return ""
 	}
@@ -237,12 +164,12 @@ func installPythonDeps(c *config.Config) string {
 		line += sshMount
 		line += " GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'"
 	}
-	line += fmt.Sprintf(" python -m pip install --user %s ", indices(c))
+	line += fmt.Sprintf(" python -m pip install --user %s ", formatPipIndices(c))
 	line += strings.Join(c.Dependencies, " ")
 	return line
 }
 
-func installPythonDepsFromRequirements(c *config.Config, useSsh bool) string {
+func installPythonDepsFromRequirements(c *config.Config) string {
 	line := "\n"
 	line += fmt.Sprintf("COPY %s /requirements.txt", c.Requirements)
 	line += "\n"
@@ -264,22 +191,22 @@ func installPythonDepsFromRequirements(c *config.Config, useSsh bool) string {
 			}
 		}
 	}
-	if useSsh {
+	if c.DependenciesUseSsh {
 		line += sshMount
 		line += " GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'"
 	}
-	line += fmt.Sprintf(" python -m pip install --user %s -r /requirements.txt", indices(c))
+	line += fmt.Sprintf(" python -m pip install --user %s -r /requirements.txt", formatPipIndices(c))
 	return line
 }
 
-func installPythonProject(c *config.Config) string {
+func installProject(c *config.Config) string {
 	line := "\n"
 	line += "COPY . /projectdir\n"
 	line += fmt.Sprintf("RUN %s python -m pip install --no-deps /projectdir", pipCacheMount)
 	return line
 }
 
-func clearCachedDataFromInstall(c *config.Config) string {
+func clearInstalledPythonLibs(c *config.Config) string {
 	line := "\n"
 	if len(c.Dependencies) > 0 {
 		line += "RUN find /root/.local/lib/python*/ -name 'tests' -exec rm -r '{}' + && "
