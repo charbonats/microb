@@ -97,6 +97,7 @@ Available configuration options are listed in the table below.
 | -   | `add_files`               | no       | additional files to add into the final image. Files are not added to the build stage.                                                                                                                                                                                                                                                       | -       | `Add[]`                 |
 | -   | `copy_files_before_build` | no       | additional files to copy into the build stage. Files are not copied to the final image.                                                                                                                                                                                                                                                     | -       | `Copy[]`                |
 | -   | `add_files_before_build`  | no       | additional files to add into the build stage. Files are not added to the final image.                                                                                                                                                                                                                                                       | -       | `Add[]`                 |
+
 #### Copy
 
 > Refer to https://docs.docker.com/reference/dockerfile/#copy for more information. Note that only `--from` option is supported. The other options (such as `--chmod` or `--chown`) are not currently supported.
@@ -139,6 +140,25 @@ docker buildx build --secret id=az_feed_token,env=AZ_FEED_TOKEN -t example -f py
 
 The [example folder](example) contains a few examples how you can use `microb`.
 
+## Which problems does this solve ?
+
+- **No need to learn Dockerfile syntax**: `microb` uses the `pyproject.toml` file to gather the required dependencies and build the container image. No need for an additional Dockerfile or a separate build configuration !
+
+- **No need to install an additional tool**: `microb` is a buildkit frontend. It is seamlessly integrated and run by [buildkit](https://docs.docker.com/build/buildkit/).
+
+- **No need to choose a base image**: `microb` uses the python version defined in the `pyproject.toml` file to find the right base image for you.
+
+- **Automatically install python project**: `microb` automates the installation of a python package and its dependencies within a container image.
+
+- **Multi-stage build: smaller image**: `microb` uses the `pyproject.toml` file to gather the required dependencies and install them in the build stage. The final image only contains the required runtime dependencies.
+
+- **Install pip dependencies using SSH easily**: `microb` takes care of adding an [SSH mount](https://docs.docker.com/reference/dockerfile/#run---mounttypessh) to the pip command used to install packages during build.
+
+- **Install dependencies from third-party index**: `microb` allows you to configure additional one or sevreal pip indices to install dependencies from. Build secrets can be used to securely authenticate against the index.
+
+- **Install apt dependencies easily**: `microb` takes care of adding a [cache mount](https://docs.docker.com/reference/dockerfile/#example-cache-apt-packages) to the apt command used to install packages during build for caching and clean up the `apt` cache if any package is installed in the final image.
+
+
 ## Recommendations for using `microb`
 
 - use `https` in favor of `http` if possible (for registries, for direct `whl` files and for `git`)
@@ -148,9 +168,9 @@ The [example folder](example) contains a few examples how you can use `microb`.
 - in general prefer setting up an index under the `indices` key for authentication of existing pip registries, rather
   than using in-url credentials
 
-## Build `microb`
+## Build images with `microb`
 
-`microb` can be build with every docker buildkit compatible cli. The following are a few examples:
+`microb` can be used with every docker buildkit compatible cli. The following are a few examples:
 
 #### docker:
 
