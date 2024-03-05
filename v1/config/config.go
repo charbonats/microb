@@ -12,7 +12,7 @@ import (
 )
 
 // NewConfigFromFile creates a new Config from a file path and a target.
-func NewConfigFromFile(path string, target string) (*Config, error) {
+func NewConfigFromFile(path string, target string, defaultPythonVersion string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -22,12 +22,12 @@ func NewConfigFromFile(path string, target string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewConfigFromBytes(content, target)
+	return NewConfigFromBytes(content, target, defaultPythonVersion)
 }
 
 // NewConfigFromBytes creates a new Config from a byte array and a target.
 // Byte array is expected to be UTF-8 encoded TOML data from a pyproject.toml file.
-func NewConfigFromBytes(data []byte, target string) (*Config, error) {
+func NewConfigFromBytes(data []byte, target string, defaultPythonVersion string) (*Config, error) {
 	var pyproject PyProject
 	_, err := toml.Decode(string(data), &pyproject)
 	if err != nil {
@@ -43,7 +43,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		}
 		// If there is still no target found, use default values
 		if target == "" {
-			pythonVersion, err := findVersion(requiresPython, "")
+			pythonVersion, err := findVersion(requiresPython, defaultPythonVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -68,6 +68,9 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		// Do nothing
 	default:
 		return nil, fmt.Errorf("flavor %s not supported", appConfig.Flavor)
+	}
+	if appConfig.PythonVersion == "" {
+		appConfig.PythonVersion = defaultPythonVersion
 	}
 	pythonVersion, err := findVersion(requiresPython, appConfig.PythonVersion)
 	if err != nil {
@@ -221,7 +224,7 @@ func findVersion(requires string, target string) (string, error) {
 	if target != "" {
 		v, err := version.NewVersion(target)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("version %s is not valid", target)
 		}
 		if constraints.Check(v) {
 			return target, nil

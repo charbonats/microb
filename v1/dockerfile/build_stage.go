@@ -246,6 +246,13 @@ func installPythonDepsFromRequirements(c *config.Config, useSsh bool) string {
 	line := "\n"
 	line += fmt.Sprintf("COPY %s /requirements.txt", c.Requirements)
 	line += "\n"
+	// Remove all file requirements since they will not be available at build time
+	// Rye generates a requirements.lock file that contains an additional entry:
+	// -e file:.
+	// This entry is not desired at this time because the project sources have
+	// not been copied yet.
+	// The sed command is used to remove all lines starting with "-e"
+	line += "RUN sed '/^-e/d' /requirements.txt > requirements.txt\n"
 	line += fmt.Sprintf("RUN %s", pipCacheMount)
 	if len(c.Indices) > 0 {
 		for _, index := range c.Indices {

@@ -311,12 +311,11 @@ func readMicrobConfig(ctx context.Context, c client.Client, target string) (*con
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read pyproject.toml")
 	}
-
-	cfg, err := config.NewConfigFromBytes(pyprojectContent, target)
+	defaultPythonVersion := readPythonVersion(ctx, c)
+	cfg, err := config.NewConfigFromBytes(pyprojectContent, target, defaultPythonVersion)
 	if err != nil {
 		return nil, errors.Wrap(err, "error on getting parsing config")
 	}
-
 	return cfg, nil
 }
 
@@ -401,6 +400,18 @@ func readDockerIgnoreFile(ctx context.Context, c client.Client) ([]string, error
 	}
 
 	return excludes, nil
+}
+
+// readPythonVersion reads the .python-version file from the local context
+func readPythonVersion(ctx context.Context, c client.Client) string {
+	content, err := readFileFromLocal(ctx, c, localNameContext, ".python-version", false)
+	if err != nil {
+		return ""
+	}
+	if len(content) == 0 {
+		return ""
+	}
+	return string(content)
 }
 
 // readRequirementsTxt reads the requirements.txt file from the local context
