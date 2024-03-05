@@ -31,3 +31,16 @@ func Filter(mapping map[string]string, prefix string) map[string]string {
 
 	return filtered
 }
+
+// Unique returns a new slice containing only the unique elements of the given slice
+func Unique(slice []string) []string {
+	keys := make(map[string]struct{})
+	for _, entry := range slice {
+		keys[entry] = struct{}{}
+	}
+	uniqueKeys := make([]string, 0, len(keys))
+	for key := range keys {
+		uniqueKeys = append(uniqueKeys, key)
+	}
+	return uniqueKeys
+}

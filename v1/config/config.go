@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/charbonats/microbuild/v1/utils"
 	"github.com/hashicorp/go-version"
 )
 
@@ -62,6 +63,16 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	dependencies := pyproject.Project.Dependencies
+	if len(appConfig.Extras) > 0 {
+		for _, extra := range appConfig.Extras {
+			extraDeps, ok := pyproject.Project.OptionalDependencies[extra]
+			if !ok {
+				return nil, fmt.Errorf("extra %s not found in pyproject.toml", extra)
+			}
+			dependencies = append(dependencies, extraDeps...)
+		}
+	}
 	config := Config{
 		Name:                 pyproject.Project.Name,
 		Authors:              pyproject.Project.Authors,
@@ -72,7 +83,7 @@ func NewConfigFromBytes(data []byte, target string) (*Config, error) {
 		Labels:               appConfig.Labels,
 		BuildDeps:            appConfig.BuildDeps,
 		SystemDeps:           appConfig.SystemDeps,
-		Dependencies:         pyproject.Project.Dependencies,
+		Dependencies:         utils.Unique(dependencies),
 		Indices:              appConfig.Indices,
 		CopyFiles:            appConfig.CopyFiles,
 		CopyFilesBeforeBuild: appConfig.CopyFilesBeforeBuild,
@@ -138,10 +149,11 @@ type PyProject struct {
 
 // Project is a struct that represents a project section in a pyproject.toml file.
 type Project struct {
-	Name           string   `toml:"name"`
-	Authors        []Author `toml:"authors"`
-	Dependencies   []string `toml:"dependencies"`
-	RequiresPython string   `toml:"requires-python"`
+	Name                 string              `toml:"name"`
+	Authors              []Author            `toml:"authors"`
+	Dependencies         []string            `toml:"dependencies"`
+	OptionalDependencies map[string][]string `toml:"optional-dependencies"`
+	RequiresPython       string              `toml:"requires-python"`
 }
 
 // Author is a struct that represents an author found in a pyproject.toml file.
@@ -169,6 +181,7 @@ type MicrobTarget struct {
 	Command              []string          `toml:"command"`
 	PythonVersion        string            `toml:"python_version"`
 	Indices              []Index           `toml:"indices"`
+	Extras               []string          `toml:"extras"`
 	Env                  map[string]string `toml:"environment"`
 	Labels               map[string]string `toml:"labels"`
 	BuildDeps            []string          `toml:"build_deps"`

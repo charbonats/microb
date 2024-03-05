@@ -13,6 +13,14 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+test = [
+    "nats-test-server",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+]
+
 [tool.setuptools]
 py-modules = ["example"]
 
@@ -20,15 +28,16 @@ py-modules = ["example"]
 version = {attr = "example.__version__"}
 
 [tool.microb.target.default]
-entrypoint = ["micro", "run"]
-command = ["example:setup"]
 build_deps = ["build-essential", "libffi-dev"]
 system_deps = ["gettext"]
-env = { "FOO" = "bar" }
-labels = { "com.example.foo" = "${TEST:-World}" }
 indices = [
     { "url" = "https://pypi.org/simple" }
 ]
+extras = ["test"]
+entrypoint = ["micro", "run"]
+command = ["example:setup"]
+env = { "FOO" = "bar" }
+labels = { "com.example.foo" = "${TEST:-World}" }
 copy_files = [
     { "src" = "file.txt", "dst" = "/file.txt" },
     { "from" = "docker.io/nats:2.10", "src" = "/nats-server", "dst" = "/nats-server" },
