@@ -8,9 +8,16 @@ authors = [
 requires-python = ">=3.8,<3.12"
 dependencies = [
     "nats-py",
-    "nkeys"
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+test = [
+    "nats-test-server",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+]
 
 [tool.setuptools]
 py-modules = ["example"]
@@ -19,9 +26,6 @@ py-modules = ["example"]
 version = {attr = "example.__version__"}
 
 [tool.microb.target.default]
-system_deps = ["gettext"]
-build_deps = ["build-essential", "libffi-dev"]
 entrypoint = ["micro", "run"]
 command = ["example:setup"]
-env = { "FOO" = "bar" }
-labels = { "com.example.foo" = "${TEST:-World}" }
+extras = ["test"]

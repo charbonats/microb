@@ -1,0 +1,18 @@
+#syntax=gucharbon/microb
+[project]
+name = "my_example"
+authors = [
+    {name = "Guillaume Charbonnier", email = "gu.charbon@gmail.com"},
+    {name = "Someone else", email = "someone.else@gmail.com"},
+]
+requires-python = ">=3.8,<3.12"
+dependencies = [
+    "nats-py",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+py-modules = ["example"]
+
+[tool.setuptools.dynamic]
+version = {attr = "example.__version__"}
